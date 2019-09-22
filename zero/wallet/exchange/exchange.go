@@ -41,10 +41,9 @@ import (
 
 type Account struct {
 	wallet        accounts.Wallet
-	pk            *c_type.Uint512
+	key            *c_type.Uint512
 	tk            *c_type.Tk
 	skr           c_type.PKr
-	mainPkr       c_type.PKr
 	balances      map[string]*big.Int
 	utxoNums      map[string]uint64
 	isChanged     bool
@@ -174,9 +173,9 @@ func NewExchange(dbpath string, txPool *core.TxPool, accountManager *accounts.Ma
 
 	AddJob("0/10 * * * * ?", exchange.fetchBlockInfo)
 
-	if autoMerge {
-		AddJob("0 0/5 * * * ?", exchange.merge)
-	}
+	//if autoMerge {
+	//	AddJob("0 0/5 * * * ?", exchange.merge)
+	//}
 
 	go exchange.updateAccount()
 	log.Info("Init NewExchange success")
@@ -185,24 +184,23 @@ func NewExchange(dbpath string, txPool *core.TxPool, accountManager *accounts.Ma
 
 func (self *Exchange) initWallet(w accounts.Wallet) {
 
-	if _, ok := self.accounts.Load(*w.Accounts()[0].Address.ToUint512()); !ok {
+	if _, ok := self.accounts.Load(*w.Accounts()[0].Key.ToUint512()); !ok {
 		account := Account{}
 		account.wallet = w
-		account.pk = w.Accounts()[0].Address.ToUint512()
+		account.key = w.Accounts()[0].Key.ToUint512()
 		account.tk = w.Accounts()[0].Tk.ToTK()
 		copy(account.skr[:], account.tk[:])
-		account.mainPkr = prepare.CreatePkr(account.pk, 1)
 		account.isChanged = true
 		account.nextMergeTime = time.Now()
-		self.accounts.Store(*account.pk, &account)
+		self.accounts.Store(*account.key, &account)
 
-		if num := self.starNum(account.pk); num > w.Accounts()[0].At {
-			self.numbers.Store(*account.pk, num)
+		if num := self.starNum(account.key); num > w.Accounts()[0].At {
+			self.numbers.Store(*account.key, num)
 		} else {
-			self.numbers.Store(*account.pk, w.Accounts()[0].At)
+			self.numbers.Store(*account.key, w.Accounts()[0].At)
 		}
 
-		log.Info("Add PK", "address", w.Accounts()[0].Address, "At", self.GetCurrencyNumber(*account.pk))
+		log.Info("Add accountKey", "key", w.Accounts()[0].Key, "At", self.GetCurrencyNumber(*account.key))
 	}
 }
 
@@ -234,8 +232,8 @@ func (self *Exchange) updateAccount() {
 				//wallet := event.Wallet
 				self.initWallet(event.Wallet)
 			case accounts.WalletDropped:
-				pk := *event.Wallet.Accounts()[0].Address.ToUint512()
-				self.numbers.Delete(pk)
+				key := *event.Wallet.Accounts()[0].Key.ToUint512()
+				self.numbers.Delete(key)
 			}
 			self.lock.Unlock()
 
@@ -460,9 +458,9 @@ func (self *Exchange) GetRecordsByPkr(pkr c_type.PKr, begin, end uint64) (record
 		err = errors.New("not found PK by pkr")
 		return
 	}
-	PK := account.pk
+	key := account.key
 
-	err = self.iteratorUtxo(PK, begin, end, func(utxo Utxo) {
+	err = self.iteratorUtxo(key, begin, end, func(utxo Utxo) {
 		if pkr != utxo.Pkr {
 			return
 		}
@@ -798,13 +796,13 @@ func (self *Exchange) fetchAndIndexUtxo(start, countBlock uint64, pks []c_type.U
 				continue
 			}
 
-			key := PkKey{PK: *account.pk, Num: out.State.Num}
+			key := PkKey{PK: *account.key, Num: out.State.Num}
 			dout := DecOuts([]txtool.Out{out}, &account.skr)[0]
 			utxo := Utxo{Pkr: *pkr, Root: out.Root, Nil: dout.Nil, TxHash: out.State.TxHash, Num: out.State.Num, Asset: dout.Asset, IsZ: out.State.OS.IsZero()}
 			//log.Info("DecOuts", "PK", base58.EncodeToString(account.pk[:]), "root", common.Bytes2Hex(out.Root[:]), "currency", common.BytesToString(utxo.Asset.Tkn.Currency[:]), "value", utxo.Asset.Tkn.Value)
 			nilsMap[utxo.Root] = utxo
 			nilsMap[utxo.Nil] = utxo
-			log.Warn("++++++++++++DecOuts", "PK", base58.Encode(account.pk[:])[:5], "root", hexutil.Encode(utxo.Root[:])[:5], "cy", utils.Uint256ToCurrency(&utxo.Asset.Tkn.Currency), "value", utxo.Asset.Tkn.Value, "type", out.State.OS.TxType(), "nil", hexutil.Encode(dout.Nil[:]))
+			log.Warn("++++++++++++DecOuts", "key", base58.Encode(account.key[:])[:5], "root", hexutil.Encode(utxo.Root[:])[:5], "cy", utils.Uint256ToCurrency(&utxo.Asset.Tkn.Currency), "value", utxo.Asset.Tkn.Value, "type", out.State.OS.TxType(), "nil", hexutil.Encode(dout.Nil[:]))
 
 			if list, ok := utxosMap[key]; ok {
 				utxosMap[key] = append(list, utxo)
@@ -1061,11 +1059,11 @@ type MergeUtxos struct {
 
 var default_fee_value = new(big.Int).Mul(big.NewInt(25000), big.NewInt(1000000000))
 
-func (self *Exchange) getMergeUtxos(from *c_type.Uint512, currency string, zcount int, left int) (mu MergeUtxos, e error) {
+func (self *Exchange) getMergeUtxos(key *c_type.Uint512, currency string, zcount int, left int) (mu MergeUtxos, e error) {
 	if zcount > 400 {
 		e = errors.New("zout count must <= 400")
 	}
-	prefix := utxoPkKey(*from, common.LeftPadBytes([]byte(currency), 32), nil)
+	prefix := utxoPkKey(*key, common.LeftPadBytes([]byte(currency), 32), nil)
 	iterator := self.db.NewIteratorWithPrefix(prefix)
 	outxos := UtxoList{}
 	zutxos := UtxoList{}
@@ -1119,13 +1117,14 @@ type MergeParam struct {
 }
 
 func (self *Exchange) GenMergeTx(mp *MergeParam) (txParam *txtool.GTxParam, e error) {
-	account := self.getAccountByPk(mp.From)
-	if account == nil {
-		e = errors.New("account is nil")
-		return
-	}
+	//account := self.getAccountByPk(mp.From)
+	//if account == nil {
+	//	e = errors.New("account is nil")
+	//	return
+	//}
 	if mp.To == nil {
-		mp.To = &account.mainPkr
+		e = errors.New("mp to is nil")
+		return
 	}
 	var mu MergeUtxos
 	if mu, e = self.getMergeUtxos(&mp.From, mp.Currency, int(mp.Zcount), int(mp.Left)); e != nil {
@@ -1162,8 +1161,8 @@ func (self *Exchange) GenMergeTx(mp *MergeParam) (txParam *txtool.GTxParam, e er
 	return
 }
 
-func (self *Exchange) Merge(pk *c_type.Uint512, currency string, force bool) (count int, txhash c_type.Uint256, e error) {
-	account := self.getAccountByPk(*pk)
+func (self *Exchange) Merge(mainPkr c_type.PKr, currency string, force bool) (count int, txhash c_type.Uint256, e error) {
+	account := self.getAccountByPkr(mainPkr)
 	if account == nil {
 		e = errors.New("account is nil")
 		return
@@ -1176,7 +1175,7 @@ func (self *Exchange) Merge(pk *c_type.Uint512, currency string, force bool) (co
 	}
 
 	var mu MergeUtxos
-	if mu, e = self.getMergeUtxos(pk, currency, 100, 10); e != nil {
+	if mu, e = self.getMergeUtxos(account.key, currency, 100, 10); e != nil {
 		return
 	}
 
@@ -1187,11 +1186,11 @@ func (self *Exchange) Merge(pk *c_type.Uint512, currency string, force bool) (co
 		var Currency c_type.Uint256
 		copy(Currency[:], bytes[:])
 
-		receptions := []prepare.Reception{{Addr: account.mainPkr, Asset: assets.Asset{Tkn: &assets.Token{Currency: Currency, Value: utils.U256(mu.amount)}}}}
+		receptions := []prepare.Reception{{Addr: mainPkr, Asset: assets.Asset{Tkn: &assets.Token{Currency: Currency, Value: utils.U256(mu.amount)}}}}
 
 		if len(mu.tickets) > 0 {
 			for value, category := range mu.tickets {
-				receptions = append(receptions, prepare.Reception{Addr: account.mainPkr, Asset: assets.Asset{Tkt: &assets.Ticket{category, value}}})
+				receptions = append(receptions, prepare.Reception{Addr: mainPkr, Asset: assets.Asset{Tkt: &assets.Ticket{category, value}}})
 			}
 		}
 
@@ -1202,7 +1201,7 @@ func (self *Exchange) Merge(pk *c_type.Uint512, currency string, force bool) (co
 			},
 			GasPrice:   *big.NewInt(1000000000),
 			Utxos:      mu.list.Roots(),
-			RefundTo:   account.mainPkr,
+			RefundTo:   mainPkr,
 			Receptions: receptions,
 			Cmds:       prepare.Cmds{},
 		}
@@ -1229,22 +1228,22 @@ func (self *Exchange) Merge(pk *c_type.Uint512, currency string, force bool) (co
 		return
 	}
 }
-
-func (self *Exchange) merge() {
-	if txtool.Ref_inst.Bc == nil || !txtool.Ref_inst.Bc.IsValid() {
-		return
-	}
-	self.accounts.Range(func(key, value interface{}) bool {
-		account := value.(*Account)
-		if count, txhash, err := self.Merge(account.pk, "SERO", false); err != nil {
-			log.Error("autoMerge fail", "PK", utils.Base58Encode(account.pk[:]), "count", count, "error", err)
-		} else {
-			log.Info("autoMerge succ", "PK", utils.Base58Encode(account.pk[:]), "tx", hexutil.Encode(txhash[:]), "count", count)
-		}
-		return true
-	})
-
-}
+//
+//func (self *Exchange) merge() {
+//	if txtool.Ref_inst.Bc == nil || !txtool.Ref_inst.Bc.IsValid() {
+//		return
+//	}
+//	self.accounts.Range(func(key, value interface{}) bool {
+//		account := value.(*Account)
+//		if count, txhash, err := self.Merge(account.pk, "SERO", false); err != nil {
+//			log.Error("autoMerge fail", "PK", utils.Base58Encode(account.pk[:]), "count", count, "error", err)
+//		} else {
+//			log.Info("autoMerge succ", "PK", utils.Base58Encode(account.pk[:]), "tx", hexutil.Encode(txhash[:]), "count", count)
+//		}
+//		return true
+//	})
+//
+//}
 
 var (
 	numPrefix  = []byte("NUM")

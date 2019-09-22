@@ -20,6 +20,7 @@ import (
 	"bufio"
 	"encoding/json"
 	"fmt"
+	"github.com/sero-cash/go-sero/common"
 	"os"
 	"path/filepath"
 	"sort"
@@ -55,7 +56,7 @@ func (s accountsByTag) Swap(i, j int) { s[i], s[j] = s[j], s[i] }
 // AmbiguousAddrError is returned when attempting to unlock
 // an address for which more than one file exists.
 type AmbiguousAddrError struct {
-	Addr    address.AccountAddress
+	Key	    common.AccountKey
 	Matches []accounts.Account
 }
 
@@ -76,7 +77,7 @@ type accountCache struct {
 	watcher  *watcher
 	mu       sync.Mutex
 	all      accountsByTag
-	byAddr   map[address.AccountAddress][]accounts.Account
+	byAddr   map[common.AccountKey][]accounts.Account
 	throttle *time.Timer
 	notify   chan struct{}
 	fileC    fileCache
@@ -85,7 +86,7 @@ type accountCache struct {
 func newAccountCache(keydir string) (*accountCache, chan struct{}) {
 	ac := &accountCache{
 		keydir: keydir,
-		byAddr: make(map[address.AccountAddress][]accounts.Account),
+		byAddr: make(map[common.AccountKey][]accounts.Account),
 		notify: make(chan struct{}, 1),
 		fileC:  fileCache{all: mapset.NewThreadUnsafeSet()},
 	}
@@ -113,11 +114,11 @@ func (ac *accountCache) accountsByTag() []accountByTag {
 	return cpy
 }
 
-func (ac *accountCache) hasAddress(addr address.AccountAddress) bool {
+func (ac *accountCache) hasAddress(key  common.AccountKey) bool {
 	ac.maybeReload()
 	ac.mu.Lock()
 	defer ac.mu.Unlock()
-	return len(ac.byAddr[addr]) > 0
+	return len(ac.byAddr[key]) > 0
 }
 
 func (ac *accountCache) add(newAccount accounts.Account, update bool) {
@@ -132,7 +133,7 @@ func (ac *accountCache) add(newAccount accounts.Account, update bool) {
 	ac.all = append(ac.all, accountByTag{accountByURL: accounts.Account{}})
 	copy(ac.all[i+1:], ac.all[i:])
 	ac.all[i] = accountByTag{newAccount, update}
-	ac.byAddr[newAccount.Address] = append(ac.byAddr[newAccount.Address], newAccount)
+	ac.byAddr[newAccount.Key] = append(ac.byAddr[newAccount.Key], newAccount)
 }
 
 // note: removed needs to be unique here (i.e. both File and Data must be set).
@@ -141,10 +142,10 @@ func (ac *accountCache) delete(removed accounts.Account) {
 	defer ac.mu.Unlock()
 
 	ac.all = removeAccountByTag(ac.all, removed)
-	if ba := removeAccount(ac.byAddr[removed.Address], removed); len(ba) == 0 {
-		delete(ac.byAddr, removed.Address)
+	if ba := removeAccount(ac.byAddr[removed.Key], removed); len(ba) == 0 {
+		delete(ac.byAddr, removed.Key)
 	} else {
-		ac.byAddr[removed.Address] = ba
+		ac.byAddr[removed.Key] = ba
 	}
 }
 
@@ -157,10 +158,10 @@ func (ac *accountCache) deleteByFile(path string) {
 	if i < len(ac.all) && ac.all[i].accountByURL.URL.Path == path {
 		removed := ac.all[i].accountByURL
 		ac.all = append(ac.all[:i], ac.all[i+1:]...)
-		if ba := removeAccount(ac.byAddr[removed.Address], removed); len(ba) == 0 {
-			delete(ac.byAddr, removed.Address)
+		if ba := removeAccount(ac.byAddr[removed.Key], removed); len(ba) == 0 {
+			delete(ac.byAddr, removed.Key)
 		} else {
-			ac.byAddr[removed.Address] = ba
+			ac.byAddr[removed.Key] = ba
 		}
 	}
 }
@@ -194,8 +195,8 @@ func (ac *accountCache) find(a accounts.Account) (accounts.Account, error) {
 		matches = append(matches, accT.accountByURL)
 	}
 
-	if (a.Address != address.AccountAddress{}) {
-		matches = ac.byAddr[a.Address]
+	if (a.Key != common.AccountKey{}) {
+		matches = ac.byAddr[a.Key]
 	}
 	if a.URL.Path != "" {
 		// If only the basename is specified, complete the path.
@@ -207,7 +208,7 @@ func (ac *accountCache) find(a accounts.Account) (accounts.Account, error) {
 				return matches[i], nil
 			}
 		}
-		if (a.Address == address.AccountAddress{}) {
+		if (a.Key == common.AccountKey{}) {
 			return accounts.Account{}, ErrNoMatch
 		}
 	}
@@ -217,7 +218,7 @@ func (ac *accountCache) find(a accounts.Account) (accounts.Account, error) {
 	case 0:
 		return accounts.Account{}, ErrNoMatch
 	default:
-		err := &AmbiguousAddrError{Addr: a.Address, Matches: make([]accounts.Account, len(matches))}
+		err := &AmbiguousAddrError{Key: a.Key, Matches: make([]accounts.Account, len(matches))}
 		copy(err.Matches, matches)
 		//sort.Sort(accountsByURL(err.Matches))
 		return accounts.Account{}, err
@@ -278,8 +279,10 @@ func (ac *accountCache) scanAccounts() error {
 		buf = new(bufio.Reader)
 		key struct {
 			Address string `json:"address"`
+			Key     string `json:"key"`
 			Tk      string `json:"tk"`
 			At      uint64 `json:"at"`
+			version uint64 `json:"vserion"`
 		}
 	)
 	readAccount := func(path string) *accounts.Account {
@@ -294,17 +297,24 @@ func (ac *accountCache) scanAccounts() error {
 		key.Address = ""
 		key.Tk = ""
 		key.At = 0
+		key.version = 0
 		err = json.NewDecoder(buf).Decode(&key)
-		addr := address.Base58ToAccount(key.Address)
+		var addressKey common.AccountKey
+		if version ==2{
+           addressKey = common.Base58ToKey(key.Key)
+		}else{
+			addressKey = common.Base58ToKey(key.Address)
+		}
+
 		tk := address.Base58ToAccount(key.Tk)
 		at := key.At
 		switch {
 		case err != nil:
 			log.Debug("Failed to decode keystore key", "path", path, "err", err)
-		case (addr == address.AccountAddress{}):
+		case (addressKey == common.AccountKey{}):
 			log.Debug("Failed to decode keystore key", "path", path, "err", "missing or zero address")
 		default:
-			return &accounts.Account{Address: addr, Tk: tk, URL: accounts.URL{Scheme: KeyStoreScheme, Path: path}, At: at}
+			return &accounts.Account{Key: addressKey, Tk: tk, URL: accounts.URL{Scheme: KeyStoreScheme, Path: path}, At: at}
 		}
 		return nil
 	}

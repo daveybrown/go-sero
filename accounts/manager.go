@@ -21,7 +21,8 @@ import (
 	"sort"
 	"sync"
 
-	"github.com/sero-cash/go-sero/common/address"
+	"github.com/sero-cash/go-czero-import/c_type"
+	"github.com/sero-cash/go-sero/common"
 	"github.com/sero-cash/go-sero/event"
 )
 
@@ -162,8 +163,19 @@ func (am *Manager) Find(account Account) (Wallet, error) {
 	return nil, ErrUnknownAccount
 }
 
-func (am *Manager) FindByKey(key *address.AccountAddress) (Wallet, error) {
-	account := Account{Address: *key}
+func (am *Manager) FindByPkr(pkr c_type.PKr) (Wallet, error) {
+	am.lock.RLock()
+	defer am.lock.RUnlock()
+	for _, wallet := range am.wallets {
+		if wallet.IsMine(account) {
+			return wallet, nil
+		}
+	}
+	return nil, ErrUnknownAccount
+}
+
+func (am *Manager) FindByKey(key *common.AccountKey) (Wallet, error) {
+	account := Account{Key: *key}
 	return am.Find(account)
 }
 

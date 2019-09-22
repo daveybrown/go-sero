@@ -163,7 +163,7 @@ func incCounter(ctr []byte) {
 	}
 }
 
-// NIST SP 800-56 Concatenation Key Derivation Function (see section 5.8.1).
+// NIST SP 800-56 Concatenation AccountKey Derivation Function (see section 5.8.1).
 func concatKDF(hash hash.Hash, z, s1 []byte, kdLen int) (k []byte, err error) {
 	if s1 == nil {
 		s1 = make([]byte, 0)

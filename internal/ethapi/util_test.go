@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/sero-cash/go-czero-import/c_type"
-	"github.com/sero-cash/go-czero-import/cpt"
+	"github.com/sero-cash/go-czero-import/c_czero"
 	"github.com/sero-cash/go-czero-import/superzk"
 	"github.com/sero-cash/go-sero/common/address"
 	"github.com/sero-cash/go-sero/common/hexutil"
@@ -14,7 +14,7 @@ import (
 )
 
 func TestMain(m *testing.M) {
-	cpt.ZeroInit_NoCircuit()
+	c_czero.ZeroInit_NoCircuit()
 	os.Exit(m.Run())
 }
 

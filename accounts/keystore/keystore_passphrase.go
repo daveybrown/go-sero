@@ -28,18 +28,18 @@ package keystore
 import (
 	"bytes"
 	"crypto/aes"
+	"crypto/cipher"
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"github.com/sero-cash/go-sero/common"
 	"io"
 	"io/ioutil"
 	"path/filepath"
 
 	"github.com/btcsuite/btcutil/base58"
-
-	"github.com/sero-cash/go-sero/common/address"
 
 	"github.com/pborman/uuid"
 	"github.com/sero-cash/go-sero/common/math"
@@ -80,7 +80,7 @@ type keyStorePassphrase struct {
 	scryptP     int
 }
 
-func (ks keyStorePassphrase) GetKey(addr address.AccountAddress, filename, auth string) (*Key, error) {
+func (ks keyStorePassphrase) GetKey(accountKey common.AccountKey, filename, auth string) (*Key, error) {
 	// Load the key from the keystore and decrypt its contents
 
 	keyjson, err := ioutil.ReadFile(filename)
@@ -93,16 +93,16 @@ func (ks keyStorePassphrase) GetKey(addr address.AccountAddress, filename, auth 
 		return nil, err
 	}
 	// Make sure we're really operating on the requested key (no swap attacks)
-	if key.Address != addr {
-		return nil, fmt.Errorf("key content mismatch: have account %x, want %x", key.Address, addr)
+	if key.AccountKey != accountKey {
+		return nil, fmt.Errorf("key content mismatch: have account %x, want %x", key.AccountKey, accountKey)
 	}
 	return key, nil
 }
 
 // StoreKey generates a key, encrypts with 'auth' and stores in the given directory
-func StoreKey(dir, auth string, scryptN, scryptP int) (address.AccountAddress, error) {
+func StoreKey(dir, auth string, scryptN, scryptP int) (common.AccountKey, error) {
 	_, a, err := storeNewKey(&keyStorePassphrase{dir, scryptN, scryptP}, rand.Reader, auth, 0)
-	return a.Address, err
+	return a.Key, err
 }
 
 func (ks keyStorePassphrase) StoreKey(filename string, key *Key, auth string) error {
@@ -168,16 +168,29 @@ func EncryptKey(key *Key, auth string, scryptN, scryptP int) ([]byte, error) {
 			MAC:          hex.EncodeToString(mac),
 		}
 	}
-	encryptedKeyJSONV1 := encryptedKeyJSONV1{
-		base58.Encode(key.Address.Bytes()),
+	encryptedKeyJSONV2 := encryptedKeyJSONV2{
+		key.AccountKey.String(),
 		base58.Encode(key.Tk.Bytes()),
 		cryptoStruct,
 		key.Id.String(),
 		version,
 		key.At,
 	}
-	return json.Marshal(encryptedKeyJSONV1)
+	return json.Marshal(encryptedKeyJSONV2)
 }
+
+func aesCTRXOR(key, inText, iv []byte) ([]byte, error) {
+	// AES-128 is selected due to size of encryptKey.
+	aesBlock, err := aes.NewCipher(key)
+	if err != nil {
+		return nil, err
+	}
+	stream := cipher.NewCTR(aesBlock, iv)
+	outText := make([]byte, len(inText))
+	stream.XORKeyStream(outText, inText)
+	return outText, err
+}
+
 
 func GetAddress(keyjson []byte) (string, error) {
 	// Parse the json into a simple map to fetch the key version
@@ -193,13 +206,12 @@ func GetAddress(keyjson []byte) (string, error) {
 	}
 }
 
+
+
+
 // DecryptKey decrypts a key from a json blob, returning the private key itself.
 func DecryptKey(keyjson []byte, auth string) (*Key, error) {
-	// Parse the json into a simple map to fetch the key version
-	m := make(map[string]interface{})
-	if err := json.Unmarshal(keyjson, &m); err != nil {
-		return nil, err
-	}
+
 	// Depending on the version try to parse one way or another
 	var (
 		keyBytes, keyId []byte
@@ -210,7 +222,7 @@ func DecryptKey(keyjson []byte, auth string) (*Key, error) {
 	if err := json.Unmarshal(keyjson, k); err != nil {
 		return nil, err
 	}
-	keyBytes, keyId, err = decryptKeyV3(k, auth)
+	keyBytes, keyId, err = decryptKey(k, auth)
 
 	// Handle any decryption errors and return the key
 	if err != nil {
@@ -220,14 +232,14 @@ func DecryptKey(keyjson []byte, auth string) (*Key, error) {
 
 	return &Key{
 		Id:         uuid.UUID(keyId),
-		Address:    crypto.PrivkeyToAddress(key),
+		AccountKey:    crypto.PrivkeyToKey(key),
 		Tk:         crypto.PrivkeyToTk(key),
 		PrivateKey: key,
 		At:         k.At,
 	}, nil
 }
 
-func decryptKeyV3(keyProtected *encryptedKeyJSONV1, auth string) (keyBytes []byte, keyId []byte, err error) {
+func decryptKey(keyProtected *encryptedKeyJSONV1, auth string) (keyBytes []byte, keyId []byte, err error) {
 
 	if keyProtected.Crypto.CipherText == "" {
 		return nil, nil, fmt.Errorf("has no privatekey for tk:%v", keyProtected.Tk)

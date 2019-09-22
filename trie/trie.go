@@ -316,10 +316,10 @@ func (t *Trie) delete(n node, prefix, key []byte) (bool, node, error) {
 		if matchlen == len(key) {
 			return true, nil, nil // remove n entirely for whole matches
 		}
-		// The key is longer than n.Key. Remove the remaining suffix
+		// The key is longer than n.AccountKey. Remove the remaining suffix
 		// from the subtrie. Child can never be nil here since the
 		// subtrie must contain at least two other values with keys
-		// longer than n.Key.
+		// longer than n.AccountKey.
 		dirty, child, err := t.delete(n.Val, append(prefix, key[:len(n.Key)]...), key[len(n.Key):])
 		if !dirty || err != nil {
 			return false, n, err
@@ -330,7 +330,7 @@ func (t *Trie) delete(n node, prefix, key []byte) (bool, node, error) {
 			// short node. Merge the nodes to avoid creating a
 			// shortNode{..., shortNode{...}}. Use concat (which
 			// always creates a new slice) instead of append to
-			// avoid modifying n.Key since it might be shared with
+			// avoid modifying n.AccountKey since it might be shared with
 			// other nodes.
 			return true, &shortNode{concat(n.Key, child.Key...), child.Val, t.newFlag()}, nil
 		default:

@@ -21,8 +21,8 @@ import (
 )
 
 type Account struct {
-	pk *c_type.Uint512
-	tk *c_type.Tk
+	key *c_type.Uint512
+	tk  *c_type.Tk
 }
 
 type StakeService struct {
@@ -198,7 +198,7 @@ func (self *StakeService) stakeIndex() {
 	}
 }
 
-func (self *StakeService) ownPkr(pkr c_type.PKr) (pk *c_type.Uint512, ok bool) {
+func (self *StakeService) ownPkr(pkr c_type.PKr) (key *c_type.Uint512, ok bool) {
 	var account *Account
 	self.accounts.Range(func(key, value interface{}) bool {
 		a := value.(*Account)
@@ -209,7 +209,7 @@ func (self *StakeService) ownPkr(pkr c_type.PKr) (pk *c_type.Uint512, ok bool) {
 		return true
 	})
 	if account != nil {
-		return account.pk, true
+		return account.key, true
 	}
 	return
 }
@@ -233,8 +233,8 @@ func (self *StakeService) updateAccount() {
 			case accounts.WalletArrived:
 				self.initWallet(event.Wallet)
 			case accounts.WalletDropped:
-				pk := *event.Wallet.Accounts()[0].Address.ToUint512()
-				self.numbers.Delete(pk)
+				key := *event.Wallet.Accounts()[0].Key.ToUint512()
+				self.numbers.Delete(key)
 			}
 			self.lock.Unlock()
 
@@ -247,18 +247,18 @@ func (self *StakeService) updateAccount() {
 }
 
 func (self *StakeService) initWallet(w accounts.Wallet) {
-	if _, ok := self.accounts.Load(*w.Accounts()[0].Address.ToUint512()); !ok {
+	if _, ok := self.accounts.Load(*w.Accounts()[0].Key.ToUint512()); !ok {
 		account := Account{}
-		account.pk = w.Accounts()[0].Address.ToUint512()
+		account.key = w.Accounts()[0].Key.ToUint512()
 		account.tk = w.Accounts()[0].Tk.ToTK()
-		self.accounts.Store(*account.pk, &account)
+		self.accounts.Store(*account.key, &account)
 
 		var num uint64
-		if num = self.starNum(account.pk); num < w.Accounts()[0].At {
+		if num = self.starNum(account.key); num < w.Accounts()[0].At {
 			num = w.Accounts()[0].At
 		}
-		self.numbers.Store(*account.pk, num)
-		log.Info("Add PK", "address", w.Accounts()[0].Address, "At", num)
+		self.numbers.Store(*account.key, num)
+		log.Info("Add PK", "address", w.Accounts()[0].Key, "At", num)
 	}
 }
 

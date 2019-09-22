@@ -19,6 +19,7 @@ package keystore
 import (
 	"crypto/ecdsa"
 	"fmt"
+	"github.com/sero-cash/go-sero/common"
 	"io"
 	"io/ioutil"
 	"os"
@@ -26,8 +27,6 @@ import (
 	"time"
 
 	"github.com/sero-cash/go-czero-import/c_czero"
-
-	"github.com/btcsuite/btcutil/base58"
 
 	"github.com/sero-cash/go-czero-import/c_type"
 
@@ -40,13 +39,13 @@ import (
 )
 
 const (
-	version = 1
+	version = 2
 )
 
 type Key struct {
 	Id uuid.UUID // Version 4 "random" for unique id not derived from key data
 	// to simplify lookups we also store the address
-	Address address.AccountAddress
+	AccountKey common.AccountKey
 
 	Tk address.AccountAddress
 	// we only store privkey as pubkey/address can be derived from it
@@ -58,7 +57,7 @@ type Key struct {
 
 type keyStore interface {
 	// Loads and decrypts the key from disk.
-	GetKey(addr address.AccountAddress, filename string, auth string) (*Key, error)
+	GetKey(accountKey common.AccountKey, filename string, auth string) (*Key, error)
 	// Writes and encrypts the key.
 	StoreKey(filename string, k *Key, auth string) error
 	// Joins filename with the key directory unless it is already absolute.
@@ -67,6 +66,15 @@ type keyStore interface {
 
 type encryptedKeyJSONV1 struct {
 	Address string     `json:"address"`
+	Tk      string     `json:"tk"`
+	Crypto  cryptoJSON `json:"crypto"`
+	Id      string     `json:"id"`
+	Version int        `json:"version"`
+	At      uint64     `json:"at"`
+}
+
+type encryptedKeyJSONV2 struct {
+	Key     string     `json:"key"`
 	Tk      string     `json:"tk"`
 	Crypto  cryptoJSON `json:"crypto"`
 	Id      string     `json:"id"`
@@ -91,7 +99,7 @@ func newKeyFromECDSA(privateKeyECDSA *ecdsa.PrivateKey, at uint64) *Key {
 	id := uuid.NewRandom()
 	key := &Key{
 		Id:         id,
-		Address:    crypto.PrivkeyToAddress(privateKeyECDSA),
+		AccountKey: crypto.PrivkeyToKey(privateKeyECDSA),
 		Tk:         crypto.PrivkeyToTk(privateKeyECDSA),
 		PrivateKey: privateKeyECDSA,
 		At:         at,
@@ -104,12 +112,12 @@ func newKeyFromTk(tk *c_type.Tk) *Key {
 	tkaddress := address.AccountAddress{}
 	copy(tkaddress[:], tk[:])
 	pk := c_czero.Tk2Pk(tk)
-	address := address.AccountAddress{}
-	copy(address[:], pk[:])
+	Addresskey := common.AccountKey{}
+	copy(Addresskey[:], pk[:])
 	key := &Key{
-		Id:      id,
-		Address: address,
-		Tk:      tkaddress,
+		Id:         id,
+		AccountKey: Addresskey,
+		Tk:         tkaddress,
 	}
 	return key
 }
@@ -127,7 +135,7 @@ func storeNewKey(ks keyStore, rand io.Reader, auth string, at uint64) (*Key, acc
 	if err != nil {
 		return nil, accounts.Account{}, err
 	}
-	a := accounts.Account{Address: key.Address, Tk: key.Tk, URL: accounts.URL{Scheme: KeyStoreScheme, Path: ks.JoinPath(keyFileName(key.Address))}, At: key.At}
+	a := accounts.Account{Key: key.AccountKey, Tk: key.Tk, URL: accounts.URL{Scheme: KeyStoreScheme, Path: ks.JoinPath(keyFileName(key.AccountKey))}, At: key.At}
 	if err := ks.StoreKey(a.URL.Path, key, auth); err != nil {
 		zeroKey(key.PrivateKey)
 		return nil, a, err
@@ -155,7 +163,7 @@ func storeNewKeyWithMnemonic(ks keyStore, auth string, at uint64) (string, *Key,
 	}
 
 	key := newKeyFromECDSA(privateKeyECDSA, at)
-	a := accounts.Account{Address: key.Address, Tk: key.Tk, URL: accounts.URL{Scheme: KeyStoreScheme, Path: ks.JoinPath(keyFileName(key.Address))}, At: key.At}
+	a := accounts.Account{Key: key.AccountKey, Tk: key.Tk, URL: accounts.URL{Scheme: KeyStoreScheme, Path: ks.JoinPath(keyFileName(key.AccountKey))}, At: key.At}
 	if err := ks.StoreKey(a.URL.Path, key, auth); err != nil {
 		zeroKey(key.PrivateKey)
 		return "", nil, a, err
@@ -187,9 +195,9 @@ func writeKeyFile(file string, content []byte) error {
 
 // keyFileName implements the naming convention for keyfiles:
 // UTC--<created_at UTC ISO8601>-<address hex>
-func keyFileName(keyAddr address.AccountAddress) string {
+func keyFileName(keyAddr common.AccountKey) string {
 	ts := time.Now().UTC()
-	return fmt.Sprintf("UTC--%s--%s", toISO8601(ts), base58.Encode(keyAddr.Bytes()))
+	return fmt.Sprintf("UTC--%s--%s", toISO8601(ts), keyAddr.String())
 }
 
 func toISO8601(t time.Time) string {

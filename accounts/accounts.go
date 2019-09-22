@@ -25,24 +25,28 @@ import (
 	"github.com/sero-cash/go-sero"
 	"github.com/sero-cash/go-sero/common"
 	"github.com/sero-cash/go-sero/common/address"
-	"github.com/sero-cash/go-sero/core/state"
-	"github.com/sero-cash/go-sero/core/types"
 	"github.com/sero-cash/go-sero/event"
-	"github.com/sero-cash/go-sero/zero/txs/tx"
 )
 
 // AccountAddress represents an Sero account located at a specific location defined
 // by the optional URL field.
 type Account struct {
-	Address address.AccountAddress `json:"address"` // Sero account address derived from the key
-	Tk      address.AccountAddress `json:"tk"`      // Sero account tk derived from the key
-	URL     URL                    `json:"url"`     // Optional resource locator within a backend
-	At      uint64                 `json:'at'`      //account create at blocknum
+	Key common.AccountKey      `json:"key"` // Sero account address derived from the key
+	Tk  address.AccountAddress `json:"tk"`  // Sero account tk derived from the key
+	URL URL                    `json:"url"` // Optional resource locator within a backend
+	At  uint64                 `json:'at'`  //account create at blocknum
 }
 
-func (self *Account) GetPKByPK(pkr *common.Address) (ret address.AccountAddress) {
+func (self *Account) GetKeyByPkr(pkr *common.Address) (ret *common.AccountKey) {
+	if c_superzk.IsMyPKr(self.Tk.ToTK(), pkr.ToPKr()) {
+		ret = &self.Key
+	}
+	return
+}
+
+func (self *Account) GetPKByPK(pk *address.AccountAddress) (ret address.AccountAddress) {
 	c_pkr := c_type.Uint512{}
-	copy(c_pkr[:], pkr[:])
+	copy(c_pkr[:], pk[:])
 	c_tk := c_type.Tk{}
 	copy(c_tk[:], self.Tk[:])
 	var c_pk c_type.Uint512
@@ -137,16 +141,8 @@ type Wallet interface {
 	// chain state reader.
 	SelfDerive(base DerivationPath, chain sero.ChainStateReader)
 
-	// EncryptTx requests the wallet to encryt the given transaction and tx.t.
-	//
-	// It looks up the account specified either solely via its address contained within,
-	// or optionally with the aid of any location metadata from the embedded URL field.
-	EncryptTx(account Account, tx *types.Transaction, txt *tx.T, state *state.StateDB) (*types.Transaction, error)
-
-	EncryptTxWithPassphrase(account Account, passphrase string, tx *types.Transaction, txt *tx.T, state *state.StateDB) (*types.Transaction, error)
-
 	// IsMine return whether an once address is mine or not
-	IsMine(onceAddress common.Address) bool
+	IsMine(pkr c_type.PKr) bool
 
 	AddressUnlocked(account Account) (bool, error)
 
