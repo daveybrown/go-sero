@@ -3,6 +3,8 @@ package ethapi
 import (
 	"context"
 
+	"github.com/sero-cash/go-sero/common/apiutil"
+
 	"github.com/sero-cash/go-czero-import/superzk"
 
 	"github.com/sero-cash/go-sero/zero/txs/stx/stx_v0"
@@ -25,7 +27,7 @@ import (
 type PublicLocalAPI struct {
 }
 
-func (s *PublicLocalAPI) DecOut(ctx context.Context, outs []txtool.Out, tk TKAddress) (douts []txtool.TDOut, e error) {
+func (s *PublicLocalAPI) DecOut(ctx context.Context, outs []txtool.Out, tk apiutil.TKAddress) (douts []txtool.TDOut, e error) {
 	tk_u64 := tk.ToTk()
 	douts = flight.DecOut(&tk_u64, outs)
 	return
@@ -41,11 +43,11 @@ func (s *PublicLocalAPI) ConfirmOutZ(ctx context.Context, key c_type.Uint256, ou
 	}
 }
 
-func (s *PublicLocalAPI) IsPkrValid(ctx context.Context, tk PKrAddress) error {
+func (s *PublicLocalAPI) IsPkrValid(ctx context.Context, tk apiutil.PKrAddress) error {
 	return nil
 }
 
-func (s *PublicLocalAPI) IsPkValid(ctx context.Context, tk PKAddress) error {
+func (s *PublicLocalAPI) IsPkValid(ctx context.Context, tk apiutil.PKAddress) error {
 	return nil
 }
 
@@ -82,12 +84,12 @@ func (s *PublicLocalAPI) Sk2Tk(ctx context.Context, sk c_type.Uint512) (address.
 	return address.BytesToAccount(tk[:]), nil
 }
 
-func (s *PublicLocalAPI) Tk2Pk(ctx context.Context, tk TKAddress) (address.AccountAddress, error) {
+func (s *PublicLocalAPI) Tk2Pk(ctx context.Context, tk apiutil.TKAddress) (address.AccountAddress, error) {
 	pk := c_czero.Tk2Pk(tk.ToTk().NewRef())
 	return address.BytesToAccount(pk[:]), nil
 }
 
-func (s *PublicLocalAPI) Pk2Pkr(ctx context.Context, pk PKAddress, index *c_type.Uint256) (PKrAddress, error) {
+func (s *PublicLocalAPI) Pk2Pkr(ctx context.Context, pk apiutil.PKAddress, index *c_type.Uint256) (apiutil.PKrAddress, error) {
 	empty := c_type.Uint256{}
 	if index != nil {
 		if (*index) == empty {
@@ -95,7 +97,7 @@ func (s *PublicLocalAPI) Pk2Pkr(ctx context.Context, pk PKAddress, index *c_type
 		}
 	}
 	pkr := superzk.Pk2PKr(pk.ToUint512().NewRef(), index)
-	var pkrAddress PKrAddress
+	var pkrAddress apiutil.PKrAddress
 	copy(pkrAddress[:], pkr[:])
 	return pkrAddress, nil
 }

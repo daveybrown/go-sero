@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"math/big"
 
+	"github.com/sero-cash/go-sero/common/apiutil"
+
 	"github.com/sero-cash/go-sero/zero/txs/stx"
 
 	"github.com/pkg/errors"
@@ -33,7 +35,7 @@ func (self *PkgCloseArgs) toCmd() *prepare.PkgCloseCmd {
 
 type PkgTransferArgs struct {
 	Id  c_type.Uint256
-	PKr ToAddress
+	PKr apiutil.ToAddress
 }
 
 func (self *PkgTransferArgs) toCmd() *prepare.PkgTransferCmd {
@@ -48,9 +50,9 @@ func (self *PkgTransferArgs) toCmd() *prepare.PkgTransferCmd {
 
 type PkgCreateArgs struct {
 	Id       c_type.Uint256
-	PKr      ToAddress
+	PKr      apiutil.ToAddress
 	Currency Smbol
-	Value    *Big
+	Value    *apiutil.Big
 	Memo     c_type.Uint512
 }
 
@@ -74,8 +76,8 @@ func (self *PkgCreateArgs) toCmd() *prepare.PkgCreateCmd {
 }
 
 type BuyShareArgs struct {
-	Value Big
-	Vote  PKrAddress
+	Value apiutil.Big
+	Vote  apiutil.PKrAddress
 	Pool  *c_type.Uint256
 }
 
@@ -92,7 +94,7 @@ func (self *BuyShareArgs) toCmd() *stx.BuyShareCmd {
 
 type RegistPoolArgs struct {
 	Value   utils.U256
-	Vote    PKrAddress
+	Vote    apiutil.PKrAddress
 	FeeRate uint32
 }
 
@@ -119,8 +121,8 @@ func (self *ClosePoolArgs) toCmd() *stx.ClosePoolCmd {
 
 type ContractArgs struct {
 	Currency Smbol
-	Value    *Big
-	To       *ContractAddress
+	Value    *apiutil.Big
+	To       *apiutil.ContractAddress
 	Data     hexutil.Bytes
 }
 
@@ -175,12 +177,12 @@ func (self *CmdsArgs) toCmds() prepare.Cmds {
 }
 
 type GenTxArgs struct {
-	From       PKAddress
-	RefundTo   *PKrAddress
+	From       apiutil.PKAddress
+	RefundTo   *apiutil.PKrAddress
 	Receptions []ReceptionArgs
 	Cmds       *CmdsArgs
 	Gas        uint64
-	GasPrice   *Big
+	GasPrice   *apiutil.Big
 	Roots      []c_type.Uint256
 }
 

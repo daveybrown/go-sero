@@ -118,3 +118,7 @@ func (w *keystoreWallet) IsMine(pkr c_type.PKr) bool {
 	succ := superzk.IsMyPKr(tk, &pkr)
 	return succ
 }
+
+func (w *keystoreWallet) FindByKey(pk c_type.Uint512) (accounts.Account, error) {
+	return w.keystore.FindByPk(pk)
+}

@@ -89,11 +89,11 @@ type Backend interface {
 	GetAnchor(roots []c_type.Uint256) ([]txtool.Witness, error)
 	CommitTx(tx *txtool.GTx) error
 
-	GetPkNumber(pkKey c_type.Uint512) (number uint64, e error)
+	GetPkNumber(accountKey common.AccountKey) (number uint64, e error)
 	GetPkr(address *c_type.Uint512, index *c_type.Uint256) (c_type.PKr, error)
 	GetBalances(address c_type.Uint512) (balances map[string]*big.Int)
 	GenTx(param prepare.PreTxParam) (*txtool.GTxParam, error)
-	GetRecordsByPk(pk *c_type.Uint512, begin, end uint64) (records []exchange.Utxo, err error)
+	GetRecordsByPk(accountKey *common.AccountKey, begin, end uint64) (records []exchange.Utxo, err error)
 	GetRecordsByPkr(pkr c_type.PKr, begin, end uint64) (records []exchange.Utxo, err error)
 	GetLockedBalances(address c_type.Uint512) (balances map[string]*big.Int)
 	GetMaxAvailable(pk c_type.Uint512, currency string) (amount *big.Int)

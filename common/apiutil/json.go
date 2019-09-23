@@ -1,18 +1,21 @@
-package ethapi
+package apiutil
 
 import (
 	"fmt"
 	"math/big"
 
-	"github.com/btcsuite/btcutil/base58"
+	"github.com/sero-cash/go-sero/common"
 
 	"github.com/sero-cash/go-sero/common/address"
 
+	"github.com/btcsuite/btcutil/base58"
+
+	"github.com/sero-cash/go-sero/accounts"
+	"github.com/sero-cash/go-sero/zero/txtool"
 	"github.com/sero-cash/go-sero/zero/utils"
 
-	"github.com/sero-cash/go-sero/common"
-	"github.com/sero-cash/go-sero/zero/txtool"
-
+	"github.com/sero-cash/go-czero-import/c_czero"
+	"github.com/sero-cash/go-czero-import/c_superzk"
 	"github.com/sero-cash/go-czero-import/c_type"
 	"github.com/sero-cash/go-czero-import/superzk"
 
@@ -26,53 +29,14 @@ type decError struct{ msg string }
 func (err decError) Error() string { return err.msg }
 
 var (
-	ErrEmptyString   = &decError{"empty input string"}
-	ErrSyntax        = &decError{"invalid hex string"}
-	ErrMissingPrefix = &decError{"hex string without 0x prefix"}
-	ErrOddLength     = &decError{"hex string of odd length"}
-	ErrUint64Range   = &decError{"hex number > 64 bits"}
+	ErrEmptyString = &decError{"empty input string"}
+	ErrSyntax      = &decError{"invalid hex string"}
 )
 
-func isString(input []byte) bool {
-	return len(input) >= 2 && input[0] == '"' && input[len(input)-1] == '"'
-}
-
-type Big big.Int
-
-func (b Big) MarshalJSON() ([]byte, error) {
-	i := big.Int(b)
-	by, err := i.MarshalJSON()
-	if err != nil {
-		return nil, err
-	}
-	if seroparam.IsExchangeValueStr() {
-		bytes := make([]byte, len(by)+2)
-		copy(bytes[1:len(bytes)-1], by[:])
-		bytes[0] = '"'
-		bytes[len(bytes)-1] = '"'
-		return bytes, nil
-	} else {
-		return by, err
-	}
-}
-
-// UnmarshalJSON implements json.Unmarshaler.
-func (b *Big) UnmarshalJSON(input []byte) error {
-	if isString(input) {
-		input = input[1 : len(input)-1]
-	}
-	i := big.Int{}
-	if e := i.UnmarshalText(input); e != nil {
-		return e
-	} else {
-		*b = Big(i)
-		return nil
-	}
-}
-
-func (b *Big) ToInt() *big.Int {
-	return (*big.Int)(b)
-}
+const PK_PREFIX = "SP"
+const TK_PREFIX = "ST"
+const PKR_PREFIX = "SC"
+const CONTRACT_PREFIX = "SS"
 
 type PKAddress [64]byte
 
@@ -97,7 +61,7 @@ func (b PKAddress) MarshalText() ([]byte, error) {
 	return ToAddressString(PK_PREFIX, b[:]), nil
 }
 
-func validPk(addr utils.Address) (e error) {
+func ValidPk(addr utils.Address) (e error) {
 	if !addr.MatchProtocol("SP") {
 		return errors.New("address protocol is not pk")
 	}
@@ -121,7 +85,7 @@ func (b *PKAddress) UnmarshalText(input []byte) error {
 	if addr, e := utils.NewAddressByString(string(input)); e != nil {
 		return e
 	} else {
-		err := validPkr(addr)
+		err := ValidPkr(addr)
 		if err != nil {
 			return err
 		}
@@ -137,12 +101,6 @@ func (b TKAddress) ToTk() c_type.Tk {
 	copy(result[:], b[:])
 
 	return result
-}
-
-func (b TKAddress) ToAccounAddress() address.AccountAddress {
-	var tk address.AccountAddress
-	copy(tk[:], b[:])
-	return tk
 }
 
 func (b TKAddress) MarshalText() ([]byte, error) {
@@ -172,7 +130,7 @@ func (b *TKAddress) UnmarshalText(input []byte) error {
 
 type PKrAddress [96]byte
 
-func validPkr(addr utils.Address) (e error) {
+func ValidPkr(addr utils.Address) (e error) {
 	currentBlockNumber := txtool.Ref_inst.Bc.GetCurrenHeader().Number.Uint64()
 	if currentBlockNumber > seroparam.SIP6() {
 		if addr.Version == "0" {
@@ -217,7 +175,7 @@ func (b *PKrAddress) UnmarshalText(input []byte) error {
 	if addr, e := utils.NewAddressByString(string(input)); e != nil {
 		return e
 	} else {
-		err := validPkr(addr)
+		err := ValidPkr(addr)
 		if err != nil {
 			return err
 		}
@@ -226,93 +184,61 @@ func (b *PKrAddress) UnmarshalText(input []byte) error {
 	}
 }
 
-type MixAddress []byte
-
-func (b MixAddress) ToPkr() c_type.PKr {
-	pkr := c_type.PKr{}
-	if len(b) == 64 {
-		pk := c_type.Uint512{}
-		copy(pk[:], b[:])
-		pkr = superzk.Pk2PKr(&pk, nil)
+func ToAddressString(protocol string, b []byte) []byte {
+	currentBlockNumber := txtool.Ref_inst.Bc.GetCurrenHeader().Number.Uint64()
+	if currentBlockNumber > seroparam.SIP5() {
+		addr := utils.NewAddressByBytes(b[:])
+		addr.SetProtocol(protocol)
+		return []byte(addr.ToCode())
 	} else {
-		copy(pkr[:], b[:])
+		return []byte(base58.Encode(b[:]))
 	}
-	return pkr
 }
 
-// UnmarshalText implements encoding.TextUnmarshaler.
-func (b *MixAddress) UnmarshalText(input []byte) error {
+func isString(input []byte) bool {
+	return len(input) >= 2 && input[0] == '"' && input[len(input)-1] == '"'
+}
 
-	if len(input) == 0 {
+type Big big.Int
+
+func (b Big) MarshalJSON() ([]byte, error) {
+	i := big.Int(b)
+	by, err := i.MarshalJSON()
+	if err != nil {
+		return nil, err
+	}
+	if seroparam.IsExchangeValueStr() {
+		bytes := make([]byte, len(by)+2)
+		copy(bytes[1:len(bytes)-1], by[:])
+		bytes[0] = '"'
+		bytes[len(bytes)-1] = '"'
+		return bytes, nil
+	} else {
+		return by, err
+	}
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (b *Big) UnmarshalJSON(input []byte) error {
+	if isString(input) {
+		input = input[1 : len(input)-1]
+	}
+	i := big.Int{}
+	if e := i.UnmarshalText(input); e != nil {
+		return e
+	} else {
+		*b = Big(i)
 		return nil
 	}
-
-	if addr, e := utils.NewAddressByString(string(input)); e != nil {
-		return e
-	} else {
-		if len(addr.Bytes) == 96 {
-			err := validPkr(addr)
-			if err != nil {
-				return err
-			}
-			*b = addr.Bytes
-			return nil
-		} else if len(addr.Bytes) == 64 {
-			err := validPkr(addr)
-			if err != nil {
-				return err
-			}
-			*b = addr.Bytes
-			return nil
-		} else {
-			return errors.New("invalid mix address")
-		}
-	}
 }
 
-type MixBase58Adrress []byte
-
-// UnmarshalText implements encoding.TextUnmarshaler.
-func (b *MixBase58Adrress) UnmarshalText(input []byte) error {
-
-	if len(input) == 0 {
-		return ErrEmptyString
-	}
-
-	if addr, e := utils.NewAddressByString(string(input)); e != nil {
-		return e
-	} else {
-		if addr.IsHex {
-			return errors.New("is not base58 address")
-		}
-		if len(addr.Bytes) == 96 {
-			err := validPkr(addr)
-			if err != nil {
-				return err
-			}
-			*b = addr.Bytes
-			return nil
-		} else if len(addr.Bytes) == 64 {
-			err := validPkr(addr)
-			if err != nil {
-				return err
-			}
-			*b = addr.Bytes
-			return nil
-		} else {
-			return errors.New("invalid mix address")
-		}
-	}
+func (b *Big) ToInt() *big.Int {
+	return (*big.Int)(b)
 }
 
 type ToAddress [96]byte
 
 func (b ToAddress) ToPKr() (ret c_type.PKr) {
-	copy(ret[:], b[:])
-	return
-}
-
-func (b ToAddress) ToAddress() (ret common.Address) {
 	copy(ret[:], b[:])
 	return
 }
@@ -333,7 +259,7 @@ func (b ToAddress) String() string {
 // UnmarshalText implements encoding.TextUnmarshaler.
 func (b *ToAddress) UnmarshalText(input []byte) error {
 	if len(input) == 0 {
-		return ErrEmptyString
+		return errors.New("empty string")
 	}
 	if addr, e := utils.NewAddressByString(string(input)); e != nil {
 		return e
@@ -348,7 +274,7 @@ func (b *ToAddress) UnmarshalText(input []byte) error {
 		} else {
 
 			if len(addr.Bytes) == 96 {
-				err := validPkr(addr)
+				err := ValidPkr(addr)
 				if err != nil {
 					return err
 				}
@@ -356,7 +282,7 @@ func (b *ToAddress) UnmarshalText(input []byte) error {
 				return nil
 
 			} else if len(addr.Bytes) == 64 {
-				err := validPk(addr)
+				err := ValidPk(addr)
 				if err != nil {
 					return err
 				}
@@ -388,7 +314,7 @@ func (b ContractAddress) MarshalText() ([]byte, error) {
 func (b *ContractAddress) UnmarshalText(input []byte) error {
 
 	if len(input) == 0 {
-		return ErrEmptyString
+		return errors.New("empty string")
 	}
 
 	if addr, e := utils.NewAddressByString(string(input)); e != nil {
@@ -429,4 +355,129 @@ func (b *ContractAddress) UnmarshalText(input []byte) error {
 		}
 	}
 
+}
+
+type MixAddress []byte
+
+func (b MixAddress) ToPkr() c_type.PKr {
+	pkr := c_type.PKr{}
+	if len(b) == 64 {
+		pk := c_type.Uint512{}
+		copy(pk[:], b[:])
+		pkr = superzk.Pk2PKr(&pk, nil)
+	} else {
+		copy(pkr[:], b[:])
+	}
+	return pkr
+}
+
+func (b MixAddress) IsPkr() bool {
+	return len(b) == 96
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (b *MixAddress) UnmarshalText(input []byte) error {
+
+	if len(input) == 0 {
+		return nil
+	}
+
+	if addr, e := utils.NewAddressByString(string(input)); e != nil {
+		return e
+	} else {
+		if len(addr.Bytes) == 96 {
+			err := ValidPkr(addr)
+			if err != nil {
+				return err
+			}
+			*b = addr.Bytes
+			return nil
+		} else if len(addr.Bytes) == 64 {
+			err := ValidPkr(addr)
+			if err != nil {
+				return err
+			}
+			*b = addr.Bytes
+			return nil
+		} else {
+			return errors.New("invalid mix address")
+		}
+	}
+}
+
+type MixBase58Adrress []byte
+
+func (b MixBase58Adrress) ToPkr() c_type.PKr {
+	pkr := c_type.PKr{}
+	if len(b) == 64 {
+		pk := c_type.Uint512{}
+		copy(pk[:], b[:])
+		pkr = superzk.Pk2PKr(&pk, nil)
+	} else {
+		copy(pkr[:], b[:])
+	}
+	return pkr
+}
+
+func (b MixBase58Adrress) IsPkr() bool {
+	return len(b) == 96
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (b *MixBase58Adrress) UnmarshalText(input []byte) error {
+
+	if len(input) == 0 {
+		return ErrEmptyString
+	}
+
+	if addr, e := utils.NewAddressByString(string(input)); e != nil {
+		return e
+	} else {
+		if addr.IsHex {
+			return errors.New("is not base58 address")
+		}
+		if len(addr.Bytes) == 96 {
+			err := ValidPkr(addr)
+			if err != nil {
+				return err
+			}
+			*b = addr.Bytes
+			return nil
+		} else if len(addr.Bytes) == 64 {
+			err := ValidPkr(addr)
+			if err != nil {
+				return err
+			}
+			*b = addr.Bytes
+			return nil
+		} else {
+			return errors.New("invalid mix address")
+		}
+	}
+}
+
+func TkToPkAddress(tk address.AccountAddress) PKAddress {
+	c_tk := tk.ToTK()
+	var c_pk c_type.Uint512
+	height := txtool.Ref_inst.Bc.GetCurrenHeader().Number.Uint64()
+	if height >= seroparam.SIP5() {
+		c_pk = c_superzk.Tk2Pk(c_tk)
+	} else {
+		c_pk = c_czero.Tk2Pk(c_tk)
+	}
+	var pk PKAddress
+	copy(pk[:], c_pk[:])
+	return pk
+
+}
+
+func AccountAddressToTkAddress(addr address.AccountAddress) TKAddress {
+	var tk TKAddress
+	copy(tk[:], addr[:])
+	return tk
+}
+
+func GetFromPK(account accounts.Account) c_type.Uint512 {
+	addr := account.GetPKByHeight()
+	return addr
 }

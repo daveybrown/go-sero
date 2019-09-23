@@ -892,18 +892,6 @@ func MakeAddress(ks *keystore.KeyStore, account string) (accounts.Account, error
 	return accs[index], nil
 }
 
-// setSerobase retrieves the serobase either from the directly specified
-// command line flags or from the keystore if CLI indexed.
-func setSerobase(ctx *cli.Context, ks *keystore.KeyStore, cfg *sero.Config) {
-	if ctx.GlobalIsSet(SerobaseFlag.Name) {
-		account, err := MakeAddress(ks, ctx.GlobalString(SerobaseFlag.Name))
-		if err != nil {
-			Fatalf("Option %q: %v", SerobaseFlag.Name, err)
-		}
-		cfg.Serobase = account.GetPKByHeight()
-	}
-}
-
 // MakePasswordList reads password lines from the file specified by the global --password flag.
 func MakePasswordList(ctx *cli.Context) []string {
 	path := ctx.GlobalString(PasswordFileFlag.Name)
@@ -1178,8 +1166,6 @@ func SetSeroConfig(ctx *cli.Context, stack *node.Node, cfg *sero.Config) {
 	checkExclusive(ctx, AlphanetFlag, DeveloperFlag)
 	//checkExclusive(ctx, FastSyncFlag, LightModeFlag, SyncModeFlag)
 
-	ks := stack.AccountManager().Backends(keystore.KeyStoreType)[0].(*keystore.KeyStore)
-	setSerobase(ctx, ks, cfg)
 	setGPO(ctx, &cfg.GPO)
 	setTxPool(ctx, &cfg.TxPool)
 	setEthash(ctx, cfg)

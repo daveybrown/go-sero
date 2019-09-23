@@ -21,11 +21,14 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"github.com/sero-cash/go-sero/zero/proofservice"
 	"math/big"
 	"runtime"
 	"sync"
 	"sync/atomic"
+
+	"github.com/sero-cash/go-sero/common/apiutil"
+
+	"github.com/sero-cash/go-sero/zero/proofservice"
 
 	"github.com/sero-cash/go-sero/voter"
 	"github.com/sero-cash/go-sero/zero/wallet/stakeservice"
@@ -40,7 +43,6 @@ import (
 
 	"github.com/sero-cash/go-sero/accounts"
 	"github.com/sero-cash/go-sero/common"
-	"github.com/sero-cash/go-sero/common/address"
 	"github.com/sero-cash/go-sero/common/hexutil"
 	"github.com/sero-cash/go-sero/consensus"
 	"github.com/sero-cash/go-sero/consensus/ethash"
@@ -102,7 +104,7 @@ type Sero struct {
 
 	miner    *miner.Miner
 	gasPrice *big.Int
-	serobase address.AccountAddress
+	serobase *accounts.Account
 
 	networkID     uint64
 	netRPCService *ethapi.PublicNetAPI
@@ -146,7 +148,6 @@ func New(ctx *node.ServiceContext, config *Config) (*Sero, error) {
 		shutdownChan:   make(chan bool),
 		networkID:      config.NetworkId,
 		gasPrice:       config.GasPrice,
-		serobase:       config.Serobase,
 		bloomRequests:  make(chan chan *bloombits.Retrieval),
 		bloomIndexer:   NewBloomIndexer(chainDb, params.BloomBitsBlocks),
 	}
@@ -211,7 +212,7 @@ func New(ctx *node.ServiceContext, config *Config) (*Sero, error) {
 	}
 
 	if config.Proof != nil {
-		proofservice.NewProofService("", sero.APIBackend, config.Proof);
+		proofservice.NewProofService("", sero.APIBackend, config.Proof)
 	}
 
 	SeroInstance = sero
@@ -335,46 +336,52 @@ func (s *Sero) ResetWithGenesisBlock(gb *types.Block) {
 	s.blockchain.ResetWithGenesisBlock(gb)
 }
 
-func (s *Sero) Serobase() (eb address.AccountAddress, err error) {
+func (s *Sero) Serobase() (eb apiutil.PKAddress, err error) {
 	s.lock.RLock()
 	serobase := s.serobase
 	s.lock.RUnlock()
 
-	if serobase != (address.AccountAddress{}) {
-		return serobase, nil
+	if serobase != nil {
+		pk := serobase.GetPKByHeight()
+		copy(eb[:], pk[:])
+		return
 	}
 	if wallets := s.AccountManager().Wallets(); len(wallets) > 0 {
 		if accounts := wallets[0].Accounts(); len(accounts) > 0 {
-			serobase := accounts[0].GetPKByHeight()
-
+			serobase := accounts[0]
 			s.lock.Lock()
-			s.serobase = serobase
+			s.serobase = &serobase
 			s.lock.Unlock()
-
-			log.Info("Serobase automatically configured", "address", serobase)
-			return serobase, nil
+			pk := serobase.GetPKByHeight()
+			copy(eb[:], pk[:])
+			log.Info("Serobase automatically configured", "address", eb)
+			return
 		}
 	}
-	return address.AccountAddress{}, fmt.Errorf("Serobase must be explicitly specified")
+	return apiutil.PKAddress{}, fmt.Errorf("Serobase must be explicitly specified")
 }
 
 // SetSerobase sets the mining reward address.
-func (s *Sero) SetSerobase(serobase address.AccountAddress) {
-	s.lock.Lock()
-	s.serobase = serobase
-	s.lock.Unlock()
+func (s *Sero) SetSerobase(serobase apiutil.MixBase58Adrress) {
+	wallet, err := s.accountManager.FindByPkr(serobase.ToPkr())
+	if err != nil {
+		s.lock.Lock()
+		s.serobase = &wallet.Accounts()[0]
+		s.lock.Unlock()
 
-	s.miner.SetSerobase(serobase)
+		s.miner.SetSerobase(wallet.Accounts()[0])
+	}
+
 }
 
 func (s *Sero) StartMining(local bool) error {
-	eb, err := s.Serobase()
-	if err != nil {
-		log.Error("Cannot start mining without serobase", "err", err)
-		return fmt.Errorf("serobase missing: %v", err)
+	eb := s.serobase
+	if eb == nil {
+		log.Error("Cannot start mining without serobase", "")
+		return fmt.Errorf("serobase missing: %v")
 	}
 	current_height := s.blockchain.CurrentHeader().Number.Uint64()
-	pkr, lic, ret := c_czero.Pk2PKrAndLICr(eb.ToUint512(), current_height)
+	pkr, lic, ret := c_czero.Pk2PKrAndLICr(eb.Key.ToUint512(), current_height)
 	ret = c_czero.CheckLICr(&pkr, &lic, current_height)
 	if !ret {
 		lic_t := c_czero.LICr{}
@@ -394,7 +401,7 @@ func (s *Sero) StartMining(local bool) error {
 		// will ensure that private networks work in single miner mode too.
 		atomic.StoreUint32(&s.protocolManager.acceptTxs, 1)
 	}
-	go s.miner.Start(eb)
+	go s.miner.Start(*eb)
 	return nil
 }
 

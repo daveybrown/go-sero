@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/sero-cash/go-sero/common/apiutil"
+
 	"github.com/sero-cash/go-czero-import/c_type"
 	"github.com/sero-cash/go-sero/zero/wallet/light"
 )
@@ -12,7 +14,7 @@ type PublicLightNodeApi struct {
 	b Backend
 }
 
-func (plna PublicLightNodeApi) GetOutsByPKr(ctx context.Context, addresses []*MixAddress, start, end uint64) (outBlockResp light.BlockOutResp, e error) {
+func (plna PublicLightNodeApi) GetOutsByPKr(ctx context.Context, addresses []*apiutil.MixAddress, start, end uint64) (outBlockResp light.BlockOutResp, e error) {
 
 	pkrs := []c_type.PKr{}
 	for _, address := range addresses {

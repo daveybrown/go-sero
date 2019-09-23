@@ -39,13 +39,11 @@ type Account struct {
 	At  uint64                 `json:'at'`  //account create at blocknum
 }
 
-func (self *Account) GetPKByPK(pk *address.AccountAddress) (ret address.AccountAddress) {
-	c_pk_f := c_type.Uint512{}
-	copy(c_pk_f[:], pk[:])
+func (self *Account) GetPKByPK(c_pk_f *c_type.Uint512) (ret c_type.Uint512) {
 	c_tk := c_type.Tk{}
 	copy(c_tk[:], self.Tk[:])
 	var c_pk c_type.Uint512
-	if c_superzk.IsSzkPK(&c_pk_f) {
+	if c_superzk.IsSzkPK(c_pk_f) {
 		c_pk = c_superzk.Tk2Pk(&c_tk)
 	} else {
 		c_pk = c_czero.Tk2Pk(&c_tk)
@@ -54,9 +52,7 @@ func (self *Account) GetPKByPK(pk *address.AccountAddress) (ret address.AccountA
 	return
 }
 
-func (self *Account) GetPKByPKr(pkr *common.Address) (ret address.AccountAddress) {
-	c_pkr := c_type.PKr{}
-	copy(c_pkr[:], pkr[:])
+func (self *Account) GetPKByPKr(c_pkr *c_type.PKr) (ret c_type.Uint512) {
 	c_tk := c_type.Tk{}
 	copy(c_tk[:], self.Tk[:])
 	var c_pk c_type.Uint512
@@ -69,7 +65,7 @@ func (self *Account) GetPKByPKr(pkr *common.Address) (ret address.AccountAddress
 	return
 }
 
-func (self *Account) GetPKByHeight() (ret address.AccountAddress) {
+func (self *Account) GetPKByHeight() (ret c_type.Uint512) {
 	height := txtool.Ref_inst.Bc.GetCurrenHeader().Number.Uint64()
 	c_tk := c_type.Tk{}
 	copy(c_tk[:], self.Tk[:])
@@ -80,6 +76,12 @@ func (self *Account) GetPKByHeight() (ret address.AccountAddress) {
 		c_pk = c_czero.Tk2Pk(&c_tk)
 	}
 	copy(ret[:], c_pk[:])
+	return
+}
+
+func (self *Account) GetAccountAddress() (ret address.AccountAddress) {
+	pk := self.GetPKByHeight()
+	copy(ret[:], pk[:])
 	return
 }
 
@@ -159,6 +161,8 @@ type Wallet interface {
 	GetSeed() (*address.Seed, error)
 
 	GetSeedWithPassphrase(passphrase string) (*address.Seed, error)
+
+	FindByKey(pk c_type.Uint512) (Account, error)
 }
 
 // Backend is a "wallet provider" that may contain a batch of accounts they can

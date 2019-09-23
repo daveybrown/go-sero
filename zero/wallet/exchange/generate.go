@@ -55,7 +55,7 @@ func (self *Exchange) DefaultRefundTo(from *c_type.Uint512, av prepare.ADDRESS_V
 	if value, ok := self.accounts.Load(*from); ok {
 		account := value.(*Account)
 		if av == prepare.AV_CZERO {
-			return prepare.CreatePkr(account.key, 1).NewRef()
+			return prepare.CreatePkr(account.key.ToUint512(), 1).NewRef()
 		} else {
 			pk, _ := c_superzk.Tk2Pk(account.tk)
 			r := utils.NewU256(1).ToRef().ToUint256()

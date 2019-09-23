@@ -93,10 +93,10 @@ func (self *Exchange) indexPkgs(pks []c_type.Uint512, batch serodb.Batch, blocks
 			}
 			var p Pkg
 			if account, ok := self.ownPkr(pks, pkg.Pack.PKr); ok {
-				p.to = account.key
+				p.to = account.wallet.Accounts()[0].GetPKByHeight().NewRef()
 			}
 			if account, ok := self.ownPkr(pks, pkg.From); ok {
-				p.from = account.key
+				p.from = account.wallet.Accounts()[0].GetPKByHeight().NewRef()
 			}
 			if p.from != nil || p.to != nil {
 				if !pkg.Closed {

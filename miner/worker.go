@@ -23,14 +23,14 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/sero-cash/go-sero/accounts"
+
 	"github.com/sero-cash/go-czero-import/c_czero"
 	"github.com/sero-cash/go-czero-import/superzk"
 
 	"github.com/sero-cash/go-czero-import/seroparam"
 
 	"github.com/sero-cash/go-sero/zero/stake"
-
-	"github.com/sero-cash/go-sero/common/address"
 
 	"github.com/sero-cash/go-sero/common"
 	"github.com/sero-cash/go-sero/consensus"
@@ -136,7 +136,7 @@ type worker struct {
 	proc    core.Validator
 	chainDb serodb.Database
 
-	coinbase address.AccountAddress
+	coinbase accounts.Account
 	extra    []byte
 
 	currentMu sync.Mutex
@@ -163,7 +163,7 @@ type worker struct {
 	//pendingVote   map[common.Hash]mapset.Set
 }
 
-func newWorker(config *params.ChainConfig, engine consensus.Engine, coinbase address.AccountAddress, voter voter, sero Backend, mux *event.TypeMux) *worker {
+func newWorker(config *params.ChainConfig, engine consensus.Engine, coinbase accounts.Account, voter voter, sero Backend, mux *event.TypeMux) *worker {
 	worker := &worker{
 		config:      config,
 		engine:      engine,
@@ -200,10 +200,10 @@ func newWorker(config *params.ChainConfig, engine consensus.Engine, coinbase add
 	return worker
 }
 
-func (self *worker) setSerobase(addr address.AccountAddress) {
+func (self *worker) setSerobase(acc accounts.Account) {
 	self.mu.Lock()
 	defer self.mu.Unlock()
-	self.coinbase = addr
+	self.coinbase = acc
 }
 
 func (self *worker) setExtra(extra []byte) {
@@ -309,7 +309,8 @@ func (self *worker) update() {
 				self.currentMu.Lock()
 				txset := types.NewTransactionsByPrice(ev.Txs)
 				addr := common.Address{}
-				pkr := superzk.Pk2PKr(self.coinbase.ToUint512(), nil)
+				coinbasePk := self.coinbase.GetPKByHeight()
+				pkr := superzk.Pk2PKr(coinbasePk.NewRef(), nil)
 				addr.SetBytes(pkr[:])
 
 				self.current.commitTransactions(self.mux, txset, self.chain, addr)
@@ -496,7 +497,7 @@ func (self *worker) commitNewWork() {
 	if atomic.LoadInt32(&self.mining) == 1 {
 		addr := common.Address{}
 		//pkr :=  superzk.Pk2PKr(self.coinbase.ToUint512(), nil)
-		pkr, licr, ret := c_czero.Pk2PKrAndLICr(self.coinbase.ToUint512(), header.Number.Uint64())
+		pkr, licr, ret := c_czero.Pk2PKrAndLICr(self.coinbase.Key.ToUint512(), header.Number.Uint64())
 		if !ret {
 			log.Error("Failed to Addr2PKrAndLICr")
 			return

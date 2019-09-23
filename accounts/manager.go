@@ -22,7 +22,6 @@ import (
 	"sync"
 
 	"github.com/sero-cash/go-czero-import/c_type"
-	"github.com/sero-cash/go-sero/common"
 	"github.com/sero-cash/go-sero/event"
 )
 
@@ -151,16 +150,17 @@ func (am *Manager) Wallet(url string) (Wallet, error) {
 // Find attempts to locate the wallet corresponding to a specific account. Since
 // accounts can be dynamically added to and removed from wallets, this method has
 // a linear runtime in the number of wallets.
-func (am *Manager) Find(account Account) (Wallet, error) {
+func (am *Manager) FindByPk(pk c_type.Uint512) (Account, error) {
 	am.lock.RLock()
 	defer am.lock.RUnlock()
 
 	for _, wallet := range am.wallets {
-		if wallet.Contains(account) {
-			return wallet, nil
+		acc, err := wallet.FindByKey(pk)
+		if err == nil {
+			return acc, nil
 		}
 	}
-	return nil, ErrUnknownAccount
+	return Account{}, ErrUnknownAccount
 }
 
 func (am *Manager) FindByPkr(pkr c_type.PKr) (Wallet, error) {
@@ -172,11 +172,6 @@ func (am *Manager) FindByPkr(pkr c_type.PKr) (Wallet, error) {
 		}
 	}
 	return nil, ErrUnknownAccount
-}
-
-func (am *Manager) FindByKey(key *common.AccountKey) (Wallet, error) {
-	account := Account{Key: *key}
-	return am.Find(account)
 }
 
 // Subscribe creates an async subscription to receive notifications when the

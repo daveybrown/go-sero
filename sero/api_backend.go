@@ -271,12 +271,12 @@ func (b *SeroAPIBackend) CommitTx(tx *txtool.GTx) error {
 	return b.sero.txPool.AddLocal(signedTx)
 }
 
-func (b *SeroAPIBackend) GetPkNumber(pk c_type.Uint512) (number uint64, e error) {
+func (b *SeroAPIBackend) GetPkNumber(accountKey common.AccountKey) (number uint64, e error) {
 	if b.sero.exchange == nil {
 		e = errors.New("not start exchange")
 		return
 	}
-	return b.sero.exchange.GetCurrencyNumber(pk), nil
+	return b.sero.exchange.GetCurrencyNumber(accountKey), nil
 }
 
 func (b *SeroAPIBackend) GetPkr(address *c_type.Uint512, index *c_type.Uint256) (pkr c_type.PKr, e error) {
@@ -324,12 +324,12 @@ func (b *SeroAPIBackend) GetRecordsByPkr(pkr c_type.PKr, begin, end uint64) (rec
 	return b.sero.exchange.GetRecordsByPkr(pkr, begin, end)
 }
 
-func (b *SeroAPIBackend) GetRecordsByPk(pk *c_type.Uint512, begin, end uint64) (records []exchange.Utxo, err error) {
+func (b *SeroAPIBackend) GetRecordsByPk(accountKey *common.AccountKey, begin, end uint64) (records []exchange.Utxo, err error) {
 	if b.sero.exchange == nil {
 		err = errors.New("not start exchange")
 		return
 	}
-	return b.sero.exchange.GetRecordsByPk(pk, begin, end)
+	return b.sero.exchange.GetRecordsByPk(accountKey, begin, end)
 }
 
 func (b *SeroAPIBackend) GetRecordsByTxHash(txHash c_type.Uint256) (records []exchange.Utxo, err error) {

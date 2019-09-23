@@ -6,6 +6,8 @@ import (
 	"math/big"
 	"strings"
 
+	"github.com/sero-cash/go-sero/common/apiutil"
+
 	"github.com/sero-cash/go-czero-import/superzk"
 
 	"github.com/pkg/errors"
@@ -89,7 +91,7 @@ func encodeStringParams(abiArgs abi.Arguments, args []string) ([]interface{}, []
 	for index, arg := range abiArgs {
 		switch arg.Type.String() {
 		case "address":
-			var addr ToAddress
+			var addr apiutil.ToAddress
 			err := addr.UnmarshalText([]byte(args[index]))
 			if err != nil {
 				return nil, nil, err
@@ -98,7 +100,7 @@ func encodeStringParams(abiArgs abi.Arguments, args []string) ([]interface{}, []
 			packArgs[index] = common.BytesToContractAddress(caddr[:])
 			address = append(address, common.BytesToAddress(addr[:]))
 		case "address[]":
-			var addrs []ToAddress
+			var addrs []apiutil.ToAddress
 			err := json.Unmarshal([]byte(args[index]), &addrs)
 			if err != nil {
 				return nil, nil, err
@@ -172,7 +174,7 @@ func encodeStringParams(abiArgs abi.Arguments, args []string) ([]interface{}, []
 	return packArgs[:], address, nil
 }
 
-func PackMethod(abi *abi.ABI, contractAddr ContractAddress, methodName string, args []string) (hexutil.Bytes, error) {
+func PackMethod(abi *abi.ABI, contractAddr apiutil.ContractAddress, methodName string, args []string) (hexutil.Bytes, error) {
 	if abi == nil {
 		return hexutil.Bytes{}, errors.New("ABI can not be nil")
 	}
@@ -208,11 +210,11 @@ func PackMethod(abi *abi.ABI, contractAddr ContractAddress, methodName string, a
 	return hexutil.Bytes(result[:]), nil
 }
 
-func (s *PublicAbiAPI) PackMethod(abi *abi.ABI, contractAddr ContractAddress, methodName string, args []string) (hexutil.Bytes, error) {
+func (s *PublicAbiAPI) PackMethod(abi *abi.ABI, contractAddr apiutil.ContractAddress, methodName string, args []string) (hexutil.Bytes, error) {
 	return PackMethod(abi, contractAddr, methodName, args)
 }
 
-func convertToContractAddr(addrs []ToAddress) (result []common.ContractAddress) {
+func convertToContractAddr(addrs []apiutil.ToAddress) (result []common.ContractAddress) {
 	for _, addr := range addrs {
 		caddr := (superzk.HashPKr(addr.ToPKr().NewRef()))
 		result = append(result, common.BytesToContractAddress(caddr[:]))
@@ -220,7 +222,7 @@ func convertToContractAddr(addrs []ToAddress) (result []common.ContractAddress) 
 	return
 }
 
-func convertToAddr(addrs []ToAddress) (result []common.Address) {
+func convertToAddr(addrs []apiutil.ToAddress) (result []common.Address) {
 	for _, addr := range addrs {
 		result = append(result, common.BytesToAddress(addr[:]))
 	}

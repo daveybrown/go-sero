@@ -3,6 +3,8 @@ package ethapi
 import (
 	"context"
 
+	"github.com/sero-cash/go-sero/common/apiutil"
+
 	"github.com/pkg/errors"
 
 	"github.com/sero-cash/go-sero/common/hexutil"
@@ -36,7 +38,7 @@ func (s *PublicFlightAPI) GetBlockByNumber(ctx context.Context, blockNum *int64)
 }
 
 type GOutArgs struct {
-	PKr   PKrAddress
+	PKr   apiutil.PKrAddress
 	Asset assets.Asset
 	Memo  c_type.Uint512
 }
@@ -51,7 +53,7 @@ func (self *GOutArgs) ToOut() (ret txtool.GOut) {
 type PreTxParamArgs struct {
 	Gas      uint64
 	GasPrice uint64
-	From     PKrAddress
+	From     apiutil.PKrAddress
 	Ins      []c_type.Uint256
 	Outs     []GOutArgs
 }
@@ -67,7 +69,7 @@ func (self *PreTxParamArgs) ToParam() (ret flight.PreTxParam) {
 	return
 }
 
-func (s *PublicFlightAPI) GenTxParam(ctx context.Context, param PreTxParamArgs, tk TKAddress) (p txtool.GTxParam, e error) {
+func (s *PublicFlightAPI) GenTxParam(ctx context.Context, param PreTxParamArgs, tk apiutil.TKAddress) (p txtool.GTxParam, e error) {
 	preTxParam := param.ToParam()
 	return flight.GenTxParam(&preTxParam, tk.ToTk())
 }
@@ -76,7 +78,7 @@ func (s *PublicFlightAPI) CommitTx(ctx context.Context, args *txtool.GTx) error 
 	return s.exchange.CommitTx(ctx, args)
 }
 
-func (s *PublicFlightAPI) Trace2Root(ctx context.Context, tk TKAddress, trace c_type.Uint256, base c_type.Uint256) (root c_type.Uint256, e error) {
+func (s *PublicFlightAPI) Trace2Root(ctx context.Context, tk apiutil.TKAddress, trace c_type.Uint256, base c_type.Uint256) (root c_type.Uint256, e error) {
 	if r := flight.Trace2Root(tk.ToTk().NewRef(), &trace, &base); r != nil {
 		root = *r
 		return
