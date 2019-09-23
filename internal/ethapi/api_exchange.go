@@ -37,11 +37,16 @@ type PublicExchangeAPI struct {
 	b Backend
 }
 
-func (s *PublicExchangeAPI) GetPkSynced(ctx context.Context, pk *PKAddress) (map[string]interface{}, error) {
-	if pk == nil {
+func (s *PublicExchangeAPI) GetPkSynced(ctx context.Context, pkAddr *PKAddress) (map[string]interface{}, error) {
+	if pkAddr == nil {
 		return nil, errors.New("pk can not be nil")
 	}
-	currentPKBlock, err := s.b.GetPkNumber(pk.ToUint512())
+	wallet, err := s.b.AccountManager().FindByPkr(pkAddr.ToPkr())
+	if err != nil {
+		return nil, err
+	}
+	pkKey := wallet.Accounts()[0].Key.ToUint512()
+	currentPKBlock, err := s.b.GetPkNumber(*pkKey)
 	if err != nil {
 		return nil, err
 	}
@@ -53,7 +58,7 @@ func (s *PublicExchangeAPI) GetPkSynced(ctx context.Context, pk *PKAddress) (map
 	if exchangeInstance == nil {
 		return nil, errors.New("exchange mode no start")
 	}
-	numbers := exchangeInstance.GetUtxoNum(pk.ToUint512())
+	numbers := exchangeInstance.GetUtxoNum(*pkKey)
 
 	// Otherwise gather the block sync stats
 	return map[string]interface{}{
@@ -91,9 +96,14 @@ func (s *PublicExchangeAPI) GetMaxAvailable(address PKAddress, currency Smbol) (
 	return (*Big)(s.b.GetMaxAvailable(address.ToUint512(), string(currency)))
 }
 
-func (s *PublicExchangeAPI) GetBalances(ctx context.Context, address PKAddress) map[string]*Big {
+func (s *PublicExchangeAPI) GetBalances(ctx context.Context, pkAddr PKAddress) map[string]*Big {
 	result := map[string]*Big{}
-	balances := s.b.GetBalances(address.ToUint512())
+	wallet, err := s.b.AccountManager().FindByPkr(pkAddr.ToPkr())
+	if err != nil {
+		return nil
+	}
+	pkKey := wallet.Accounts()[0].Key.ToUint512()
+	balances := s.b.GetBalances(*pkKey)
 	for k, v := range balances {
 		result[k] = (*Big)(v)
 	}

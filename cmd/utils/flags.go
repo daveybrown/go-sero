@@ -20,8 +20,6 @@ package utils
 import (
 	"crypto/ecdsa"
 	"fmt"
-	"github.com/sero-cash/go-sero/zero/proofservice"
-	"github.com/sero-cash/go-sero/zero/utils"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -30,9 +28,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/sero-cash/go-czero-import/c_type"
-
+	"github.com/sero-cash/go-sero/zero/proofservice"
 	"github.com/sero-cash/go-sero/zero/utils"
+
+	"github.com/sero-cash/go-czero-import/c_type"
 
 	"github.com/sero-cash/go-sero/rpc"
 	"github.com/sero-cash/go-sero/zero/zconfig"
@@ -1083,7 +1082,7 @@ func initProof(ctx *cli.Context) (cfg *proofservice.Config) {
 	if ctx.GlobalIsSet(ProofzinFeeFlag.Name) {
 		zinFee, err := utils.ParseAmount(ctx.GlobalString(ProofzinFeeFlag.Name))
 		if err != nil {
-			panic(err);
+			panic(err)
 		}
 		cfg.Fee.ZinFee = zinFee
 	}
@@ -1091,7 +1090,7 @@ func initProof(ctx *cli.Context) (cfg *proofservice.Config) {
 	if ctx.GlobalIsSet(ProofoinFeeFlag.Name) {
 		oinFee, err := utils.ParseAmount(ctx.GlobalString(ProofoinFeeFlag.Name))
 		if err != nil {
-			panic(err);
+			panic(err)
 		}
 		cfg.Fee.OinFee = oinFee
 	}
@@ -1099,7 +1098,7 @@ func initProof(ctx *cli.Context) (cfg *proofservice.Config) {
 	if ctx.GlobalIsSet(ProofoutFeeFlag.Name) {
 		outFee, err := utils.ParseAmount(ctx.GlobalString(ProofoutFeeFlag.Name))
 		if err != nil {
-			panic(err);
+			panic(err)
 		}
 		cfg.Fee.OutFee = outFee
 	}
@@ -1107,11 +1106,11 @@ func initProof(ctx *cli.Context) (cfg *proofservice.Config) {
 	if ctx.GlobalIsSet(ProofFixedFeeFlag.Name) {
 		fixedFee, err := utils.ParseAmount(ctx.GlobalString(ProofFixedFeeFlag.Name))
 		if err != nil {
-			panic(err);
+			panic(err)
 		}
 		cfg.Fee.FixedFee = fixedFee
 	}
-	return;
+	return
 }
 
 func setEthash(ctx *cli.Context, cfg *sero.Config) {
@@ -1185,7 +1184,7 @@ func SetSeroConfig(ctx *cli.Context, stack *node.Node, cfg *sero.Config) {
 	setTxPool(ctx, &cfg.TxPool)
 	setEthash(ctx, cfg)
 
-	cfg.Proof = initProof(ctx);
+	cfg.Proof = initProof(ctx)
 	cfg.SyncMode = *GlobalTextMarshaler(ctx, SyncModeFlag.Name).(*downloader.SyncMode)
 	if ctx.GlobalIsSet(NetworkIdFlag.Name) {
 		cfg.NetworkId = ctx.GlobalUint64(NetworkIdFlag.Name)

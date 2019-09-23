@@ -196,13 +196,13 @@ func (t *StateTest) genesis(config *params.ChainConfig) *core.Genesis {
 
 func (tx *stTransaction) toMessage(ps stPostState) (core.Message, error) {
 	// Derive from private key if present.
-	var from address.AccountAddress
+	var from common.AccountKey
 	if len(tx.PrivateKey) > 0 {
 		key, err := crypto.ToECDSA(tx.PrivateKey)
 		if err != nil {
 			return nil, fmt.Errorf("invalid private key: %v", err)
 		}
-		from = crypto.PrivkeyToAddress(key)
+		from = crypto.PrivkeyToKey(key)
 	}
 	// Parse recipient if present.
 	var to *common.Address

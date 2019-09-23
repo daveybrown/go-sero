@@ -41,7 +41,7 @@ import (
 
 type Account struct {
 	wallet        accounts.Wallet
-	key            *c_type.Uint512
+	key           *c_type.Uint512
 	tk            *c_type.Tk
 	skr           c_type.PKr
 	balances      map[string]*big.Int
@@ -245,8 +245,8 @@ func (self *Exchange) updateAccount() {
 	}
 }
 
-func (self *Exchange) GetUtxoNum(pk c_type.Uint512) map[string]uint64 {
-	if account := self.getAccountByPk(pk); account != nil {
+func (self *Exchange) GetUtxoNum(pkKey c_type.Uint512) map[string]uint64 {
+	if account := self.getAccountByPk(pkKey); account != nil {
 		return account.utxoNums
 	}
 	return map[string]uint64{}
@@ -1228,6 +1228,7 @@ func (self *Exchange) Merge(mainPkr c_type.PKr, currency string, force bool) (co
 		return
 	}
 }
+
 //
 //func (self *Exchange) merge() {
 //	if txtool.Ref_inst.Bc == nil || !txtool.Ref_inst.Bc.IsValid() {

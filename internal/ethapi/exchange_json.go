@@ -2,10 +2,7 @@ package ethapi
 
 import (
 	"bytes"
-	"encoding/hex"
 	"math/big"
-	"regexp"
-	"strconv"
 
 	"github.com/sero-cash/go-sero/zero/utils"
 
@@ -34,55 +31,8 @@ var (
 	ErrUint64Range   = &decError{"hex number > 64 bits"}
 )
 
-func IsBase58Str(s string) bool {
-
-	pattern := "^[" + "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz" + "]+$"
-	match, err := regexp.MatchString(pattern, s)
-	if err != nil {
-		return false
-	}
-	return match
-
-}
 func isString(input []byte) bool {
 	return len(input) >= 2 && input[0] == '"' && input[len(input)-1] == '"'
-}
-
-func bytesHave0xPrefix(input []byte) bool {
-	return len(input) >= 2 && input[0] == '0' && (input[1] == 'x' || input[1] == 'X')
-}
-
-func checkText(input []byte, wantPrefix bool) ([]byte, error) {
-	if len(input) == 0 {
-		return nil, nil // empty strings are allowed
-	}
-	if bytesHave0xPrefix(input) {
-		input = input[2:]
-	} else if wantPrefix {
-		return nil, ErrMissingPrefix
-	}
-	if len(input)%2 != 0 {
-		return nil, ErrOddLength
-	}
-	return input, nil
-}
-
-func mapError(err error) error {
-	if err, ok := err.(*strconv.NumError); ok {
-		switch err.Err {
-		case strconv.ErrRange:
-			return ErrUint64Range
-		case strconv.ErrSyntax:
-			return ErrSyntax
-		}
-	}
-	if _, ok := err.(hex.InvalidByteError); ok {
-		return ErrSyntax
-	}
-	if err == hex.ErrLength {
-		return ErrOddLength
-	}
-	return err
 }
 
 type Big big.Int

@@ -89,7 +89,7 @@ type Backend interface {
 	GetAnchor(roots []c_type.Uint256) ([]txtool.Witness, error)
 	CommitTx(tx *txtool.GTx) error
 
-	GetPkNumber(pk c_type.Uint512) (number uint64, e error)
+	GetPkNumber(pkKey c_type.Uint512) (number uint64, e error)
 	GetPkr(address *c_type.Uint512, index *c_type.Uint256) (c_type.PKr, error)
 	GetBalances(address c_type.Uint512) (balances map[string]*big.Int)
 	GenTx(param prepare.PreTxParam) (*txtool.GTxParam, error)
