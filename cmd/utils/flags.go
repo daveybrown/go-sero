@@ -30,13 +30,14 @@ import (
 	"strings"
 	"time"
 
-	"github.com/sero-cash/go-sero/common/addrutil"
+	"github.com/sero-cash/go-czero-import/c_type"
+
+	"github.com/sero-cash/go-sero/zero/utils"
 
 	"github.com/sero-cash/go-sero/rpc"
 	"github.com/sero-cash/go-sero/zero/zconfig"
 
 	"github.com/sero-cash/go-czero-import/seroparam"
-	"github.com/sero-cash/go-sero/common/address"
 
 	"github.com/sero-cash/go-sero/accounts"
 	"github.com/sero-cash/go-sero/accounts/keystore"
@@ -868,9 +869,11 @@ func makeDatabaseHandles() int {
 // a key index in the key store to an internal account representation.
 func MakeAddress(ks *keystore.KeyStore, account string) (accounts.Account, error) {
 	// If the specified account is a valid address, return it
-	_, err := addrutil.IsValidAccountAddress([]byte(account))
+	addr, err := utils.NewAddressByBase58(account)
 	if err == nil {
-		return accounts.Account{Address: address.Base58ToAccount(account)}, nil
+		var pk c_type.Uint512
+		copy(pk[:], addr.Bytes)
+		return ks.FindByPk(pk)
 	}
 	// Otherwise try to interpret the account as a keystore index
 	index, err := strconv.Atoi(account)
@@ -898,7 +901,7 @@ func setSerobase(ctx *cli.Context, ks *keystore.KeyStore, cfg *sero.Config) {
 		if err != nil {
 			Fatalf("Option %q: %v", SerobaseFlag.Name, err)
 		}
-		cfg.Serobase = account.Address
+		cfg.Serobase = account.GetPKByHeight()
 	}
 }
 

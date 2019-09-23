@@ -345,7 +345,7 @@ func (s *Sero) Serobase() (eb address.AccountAddress, err error) {
 	}
 	if wallets := s.AccountManager().Wallets(); len(wallets) > 0 {
 		if accounts := wallets[0].Accounts(); len(accounts) > 0 {
-			serobase := accounts[0].Address
+			serobase := accounts[0].GetPKByHeight()
 
 			s.lock.Lock()
 			s.serobase = serobase

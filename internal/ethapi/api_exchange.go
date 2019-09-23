@@ -312,7 +312,14 @@ func (s *PublicExchangeAPI) Merge(ctx context.Context, address *PKAddress, cy Sm
 	if exchangeInstance == nil {
 		return nil, errors.New("exchange mode no start")
 	}
-	count, hash, err := exchangeInstance.Merge(address.ToUint512().NewRef(), string(cy), true)
+	wallet, err := s.b.AccountManager().FindByPkr(address.ToPkr())
+	if err != nil {
+		return nil, err
+	}
+	fromAccount := wallet.Accounts()[0]
+	mainPk := fromAccount.GetPKByHeight()
+	mainPkr := superzk.Pk2PKr(mainPk.ToUint512().NewRef(), nil)
+	count, hash, err := exchangeInstance.Merge(mainPkr, string(cy), true)
 	log.Info("merge query utxo", "cy=", cy, "count=", count)
 	if err != nil {
 		return nil, err
@@ -454,7 +461,8 @@ func (s *PublicExchangeAPI) GetPkByPkr(ctx context.Context, pkr PKrAddress) (*ad
 	}
 	for _, wallet := range wallets {
 		if superzk.IsMyPKr(wallet.Accounts()[0].Tk.ToTK(), pkr.ToPKr()) {
-			return &wallet.Accounts()[0].Address, nil
+			pk := address.BytesToAccount(wallet.Accounts()[0].Key[:])
+			return &pk, nil
 		}
 	}
 	return nil, nil

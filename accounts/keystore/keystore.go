@@ -25,13 +25,15 @@ import (
 	crand "crypto/rand"
 	"errors"
 	"fmt"
-	"github.com/sero-cash/go-sero/common"
 	"os"
 	"path/filepath"
 	"reflect"
 	"runtime"
 	"sync"
 	"time"
+
+	"github.com/sero-cash/go-czero-import/c_type"
+	"github.com/sero-cash/go-sero/common"
 
 	"github.com/tyler-smith/go-bip39"
 
@@ -60,9 +62,9 @@ const walletRefreshCycle = 3 * time.Second
 
 // KeyStore manages a key storage directory on disk.
 type KeyStore struct {
-	storage  keyStore                             // Storage backend, might be cleartext or encrypted
-	cache    *accountCache                        // In-memory account cache over the filesystem storage
-	changes  chan struct{}                        // Channel receiving change notifications from the cache
+	storage  keyStore                        // Storage backend, might be cleartext or encrypted
+	cache    *accountCache                   // In-memory account cache over the filesystem storage
+	changes  chan struct{}                   // Channel receiving change notifications from the cache
 	unlocked map[common.AccountKey]*unlocked // Currently unlocked account (decrypted private keys)
 
 	wallets     []accounts.Wallet       // Wallet wrappers around the individual key files
@@ -316,6 +318,22 @@ func (ks *KeyStore) Find(a accounts.Account) (accounts.Account, error) {
 	return a, err
 }
 
+func (ks *KeyStore) FindByPk(pk c_type.Uint512) (accounts.Account, error) {
+	ks.refreshWallets()
+
+	ks.mu.RLock()
+	defer ks.mu.RUnlock()
+
+	cpy := make([]accounts.Wallet, len(ks.wallets))
+	copy(cpy, ks.wallets)
+	for _, wallet := range cpy {
+		if wallet.Accounts()[0].IsMyPk(pk) {
+			return wallet.Accounts()[0], nil
+		}
+	}
+	return accounts.Account{}, errors.New("unkonw address")
+}
+
 func (ks *KeyStore) getDecryptedKey(a accounts.Account, auth string) (accounts.Account, *Key, error) {
 	a, err := ks.Find(a)
 	if err != nil {
@@ -404,8 +422,8 @@ func (ks *KeyStore) ExportRewKey(a accounts.Account, passphrase string) ([]byte,
 	if err != nil {
 		return nil, err
 	}
-	seed:=crypto.FromECDSA(key.PrivateKey)
-	return seed,nil
+	seed := crypto.FromECDSA(key.PrivateKey)
+	return seed, nil
 
 }
 
@@ -462,7 +480,6 @@ func (ks *KeyStore) Update(a accounts.Account, passphrase, newPassphrase string)
 	}
 	return ks.storage.StoreKey(a.URL.Path, key, newPassphrase)
 }
-
 
 // zeroKey zeroes a private key in memory.
 func zeroKey(k *ecdsa.PrivateKey) {

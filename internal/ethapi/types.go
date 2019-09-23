@@ -4,12 +4,16 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/sero-cash/go-sero/accounts"
+
 	"github.com/sero-cash/go-sero/common/address"
 
 	"github.com/btcsuite/btcutil/base58"
 
 	"github.com/sero-cash/go-sero/common"
 
+	"github.com/sero-cash/go-czero-import/c_czero"
+	"github.com/sero-cash/go-czero-import/c_superzk"
 	"github.com/sero-cash/go-czero-import/c_type"
 	"github.com/sero-cash/go-czero-import/seroparam"
 	"github.com/sero-cash/go-czero-import/superzk"
@@ -22,8 +26,6 @@ const TK_PREFIX = "ST"
 const PKR_PREFIX = "SC"
 const CONTECT_PREFIX = "SS"
 
-type FromAddress [96]byte
-
 type PKAddress [64]byte
 
 func (b PKAddress) ToUint512() c_type.Uint512 {
@@ -31,6 +33,16 @@ func (b PKAddress) ToUint512() c_type.Uint512 {
 	copy(result[:], b[:])
 
 	return result
+}
+
+func (b PKAddress) ToPkr() c_type.PKr {
+	pk := c_type.Uint512{}
+	copy(pk[:], b[:])
+	return superzk.Pk2PKr(&pk, nil)
+}
+
+func (b PKAddress) String() string {
+	return string(toAddressString(PK_PREFIX, b[:]))
 }
 
 func (b PKAddress) MarshalText() ([]byte, error) {
@@ -72,6 +84,12 @@ func (b TKAddress) ToTk() c_type.Tk {
 	copy(result[:], b[:])
 
 	return result
+}
+
+func (b TKAddress) ToAccounAddress() address.AccountAddress {
+	var addr address.AccountAddress
+	copy(addr[:], b[:])
+	return addr
 }
 
 func (b TKAddress) MarshalText() ([]byte, error) {
@@ -127,11 +145,84 @@ func (b *PKrAddress) UnmarshalText(input []byte) error {
 	}
 }
 
+type FromAddress []byte
+
+func (b FromAddress) ToPKr() (ret c_type.PKr) {
+	if b.IsPkr() {
+		copy(ret[:], b[:])
+	} else {
+		pk := c_type.Uint512{}
+		copy(pk[:], b[:])
+		return superzk.Pk2PKr(&pk, nil)
+	}
+	return
+}
+
+func (b FromAddress) IsPkr() bool {
+	return len(b) == 96
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (b *FromAddress) UnmarshalText(input []byte) error {
+	if len(input) == 0 {
+		return ErrEmptyString
+	}
+	if addr, e := utils.NewAddressByString(string(input)); e != nil {
+		return e
+	} else {
+		isConctract, err := isContractAddress(addr.Bytes)
+		if err != nil {
+			return err
+		}
+		if isConctract {
+			return errors.New("from address can not be conract Address")
+		} else {
+
+			if len(addr.Bytes) == 96 {
+				err := validPkr(addr)
+				if err != nil {
+					return err
+				}
+				*b = addr.Bytes
+				return nil
+
+			} else if len(addr.Bytes) == 64 {
+				err := validPk(addr)
+				if err != nil {
+					return err
+				}
+				*b = addr.Bytes
+				return nil
+			} else {
+				return errors.New("from Address must be length 64 or 96")
+			}
+		}
+	}
+}
+
 type ToAddress []byte
 
 func (b ToAddress) ToPKr() (ret c_type.PKr) {
 	copy(ret[:], b[:])
 	return
+}
+
+func (b ToAddress) IsPkr() bool {
+	return len(b) == 96
+}
+
+func (b ToAddress) ToAddress() (ret common.Address) {
+	copy(ret[:], b[:])
+	return
+}
+
+func (b ToAddress) toPk() (ret c_type.Uint512) {
+	copy(ret[:], b[:])
+	return
+}
+
+func (b ToAddress) String() string {
+	return string(toAddressString("SC", b[:]))
 }
 
 // UnmarshalText implements encoding.TextUnmarshaler.
@@ -144,10 +235,10 @@ func (b *ToAddress) UnmarshalText(input []byte) error {
 	} else {
 		isConctract, err := isContractAddress(addr.Bytes)
 		if err != nil {
-			return nil
+			return err
 		}
 		if isConctract {
-			copy(b[:], addr.Bytes)
+			*b = addr.Bytes
 			return nil
 		} else {
 
@@ -156,7 +247,7 @@ func (b *ToAddress) UnmarshalText(input []byte) error {
 				if err != nil {
 					return err
 				}
-				copy(b[:], addr.Bytes)
+				*b = addr.Bytes
 				return nil
 
 			} else if len(addr.Bytes) == 64 {
@@ -226,7 +317,7 @@ func isContractAddress(b []byte) (bool, error) {
 	return txtool.Ref_inst.Bc.IsContract(addr)
 }
 
-func AcccountAddressToPkAddress(addr address.AccountAddress) PKAddress {
+func AccountAddressToPkAddress(addr address.AccountAddress) PKAddress {
 	var pk PKAddress
 	copy(pk[:], addr[:])
 	return pk
@@ -238,8 +329,27 @@ func AddressToPkrAddress(addr common.Address) PKrAddress {
 	return pkr
 }
 
-func AcccountAddressToTkAddress(addr address.AccountAddress) TKAddress {
+func AccountAddressToTkAddress(addr address.AccountAddress) TKAddress {
 	var tk TKAddress
 	copy(tk[:], addr[:])
 	return tk
+}
+
+func TkToPkAddress(tk address.AccountAddress) PKAddress {
+	c_tk := tk.ToTK()
+	var c_pk c_type.Uint512
+	height := txtool.Ref_inst.Bc.GetCurrenHeader().Number.Uint64()
+	if height >= seroparam.SIP5() {
+		c_pk = c_superzk.Tk2Pk(c_tk)
+	} else {
+		c_pk = c_czero.Tk2Pk(c_tk)
+	}
+	var pk PKAddress
+	copy(pk[:], c_pk[:])
+	return pk
+}
+
+func GetFromPK(account accounts.Account) c_type.Uint512 {
+	addr := account.GetPKByHeight()
+	return *addr.ToUint512()
 }

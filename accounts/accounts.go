@@ -22,10 +22,12 @@ import (
 	"github.com/sero-cash/go-czero-import/c_superzk"
 	"github.com/sero-cash/go-czero-import/c_type"
 	"github.com/sero-cash/go-czero-import/seroparam"
+	"github.com/sero-cash/go-czero-import/superzk"
 	"github.com/sero-cash/go-sero"
 	"github.com/sero-cash/go-sero/common"
 	"github.com/sero-cash/go-sero/common/address"
 	"github.com/sero-cash/go-sero/event"
+	"github.com/sero-cash/go-sero/zero/txtool"
 )
 
 // AccountAddress represents an Sero account located at a specific location defined
@@ -37,21 +39,14 @@ type Account struct {
 	At  uint64                 `json:'at'`  //account create at blocknum
 }
 
-func (self *Account) GetKeyByPkr(pkr *common.Address) (ret *common.AccountKey) {
-	if c_superzk.IsMyPKr(self.Tk.ToTK(), pkr.ToPKr()) {
-		ret = &self.Key
-	}
-	return
-}
-
 func (self *Account) GetPKByPK(pk *address.AccountAddress) (ret address.AccountAddress) {
-	c_pkr := c_type.Uint512{}
-	copy(c_pkr[:], pk[:])
+	c_pk_f := c_type.Uint512{}
+	copy(c_pk_f[:], pk[:])
 	c_tk := c_type.Tk{}
 	copy(c_tk[:], self.Tk[:])
 	var c_pk c_type.Uint512
-	if c_superzk.IsSzkPK(&c_pkr) {
-		c_pk, _ = c_superzk.Tk2Pk(&c_tk)
+	if c_superzk.IsSzkPK(&c_pk_f) {
+		c_pk = c_superzk.Tk2Pk(&c_tk)
 	} else {
 		c_pk = c_czero.Tk2Pk(&c_tk)
 	}
@@ -74,7 +69,8 @@ func (self *Account) GetPKByPKr(pkr *common.Address) (ret address.AccountAddress
 	return
 }
 
-func (self *Account) GetPKByHeight(height uint64) (ret address.AccountAddress) {
+func (self *Account) GetPKByHeight() (ret address.AccountAddress) {
+	height := txtool.Ref_inst.Bc.GetCurrenHeader().Number.Uint64()
 	c_tk := c_type.Tk{}
 	copy(c_tk[:], self.Tk[:])
 	var c_pk c_type.Uint512
@@ -85,6 +81,20 @@ func (self *Account) GetPKByHeight(height uint64) (ret address.AccountAddress) {
 	}
 	copy(ret[:], c_pk[:])
 	return
+}
+
+func (self *Account) IsMyPk(pk c_type.Uint512) bool {
+	c_pk_f := c_type.Uint512{}
+	copy(c_pk_f[:], pk[:])
+	c_tk := c_type.Tk{}
+	copy(c_tk[:], self.Tk[:])
+	var c_pkr c_type.PKr
+	if c_superzk.IsSzkPK(&c_pk_f) {
+		c_pkr = c_superzk.Pk2PKr(&c_pk_f, nil)
+	} else {
+		c_pkr = c_czero.Pk2PKr(&c_pk_f, nil)
+	}
+	return superzk.IsMyPKr(&c_tk, &c_pkr)
 }
 
 // Wallet represents a software or hardware wallet that might contain one or more

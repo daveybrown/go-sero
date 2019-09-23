@@ -31,8 +31,6 @@ import (
 
 	"github.com/sero-cash/go-czero-import/c_type"
 
-	"github.com/btcsuite/btcutil/base58"
-
 	"github.com/sero-cash/go-czero-import/seroparam"
 	"github.com/sero-cash/go-czero-import/superzk"
 
@@ -193,7 +191,6 @@ func init() {
 		monitorCommand,
 		// See accountcmd.go:
 		accountCommand,
-		walletCommand,
 		// See consolecmd.go:
 		consoleCommand,
 		attachCommand,
@@ -392,7 +389,7 @@ func startNode(ctx *cli.Context, stack *node.Node) {
 		for _, wallet := range ks.Wallets() {
 			err := ks.Unlock(wallet.Accounts()[0], ctx.GlobalString(utils.DeveloperPasswordFlag.Name))
 			if err != nil {
-				fmt.Printf("unclock %v failed,%v", base58.Encode(wallet.Accounts()[0].Address.Bytes()), err)
+				fmt.Printf("unclock %v failed,%v", wallet.Accounts()[0].Key, err)
 			}
 		}
 	} else {

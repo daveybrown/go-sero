@@ -167,7 +167,7 @@ func (am *Manager) FindByPkr(pkr c_type.PKr) (Wallet, error) {
 	am.lock.RLock()
 	defer am.lock.RUnlock()
 	for _, wallet := range am.wallets {
-		if wallet.IsMine(account) {
+		if wallet.IsMine(pkr) {
 			return wallet, nil
 		}
 	}
