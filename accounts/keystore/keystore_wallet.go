@@ -23,9 +23,6 @@ import (
 
 	"github.com/sero-cash/go-sero"
 	"github.com/sero-cash/go-sero/accounts"
-	"github.com/sero-cash/go-sero/core/state"
-	"github.com/sero-cash/go-sero/core/types"
-	"github.com/sero-cash/go-sero/zero/txs/tx"
 )
 
 // keystoreWallet implements the accounts.Wallet interface for the original
@@ -82,22 +79,6 @@ func (w *keystoreWallet) Derive(path accounts.DerivationPath, pin bool) (account
 // there is no notion of hierarchical account derivation for plain keystore accounts.
 func (w *keystoreWallet) SelfDerive(base accounts.DerivationPath, chain sero.ChainStateReader) {}
 
-func (w *keystoreWallet) EncryptTx(account accounts.Account, tx *types.Transaction, txt *tx.T, state *state.StateDB) (*types.Transaction, error) {
-	// Make sure the requested account is contained within
-	if account.Key != w.account.Key {
-		return nil, accounts.ErrUnknownAccount
-	}
-	if account.URL != (accounts.URL{}) && account.URL != w.account.URL {
-		return nil, accounts.ErrUnknownAccount
-	}
-	seed, err := w.keystore.GetSeed(account)
-	if err != nil {
-		return nil, err
-	}
-	return w.EncryptTxWithSeed(*seed, tx, txt, state)
-
-}
-
 func (w *keystoreWallet) AddressUnlocked(account accounts.Account) (bool, error) {
 	if account.Key != w.account.Key {
 		return false, accounts.ErrUnknownAccount
@@ -110,27 +91,6 @@ func (w *keystoreWallet) AddressUnlocked(account accounts.Account) (bool, error)
 		return false, err
 	}
 	return true, nil
-}
-
-func (w *keystoreWallet) EncryptTxWithSeed(seed address.Seed, btx *types.Transaction, txt *tx.T, state *state.StateDB) (tx *types.Transaction, e error) {
-	return
-}
-
-func (w *keystoreWallet) EncryptTxWithPassphrase(account accounts.Account, passphrase string, tx *types.Transaction, txt *tx.T, state *state.StateDB) (*types.Transaction, error) {
-	// Make sure the requested account is contained within
-	if account.Key != w.account.Key {
-		return nil, accounts.ErrUnknownAccount
-	}
-	if account.URL != (accounts.URL{}) && account.URL != w.account.URL {
-		return nil, accounts.ErrUnknownAccount
-	}
-
-	seed, err := w.keystore.GetSeedWithPassphrase(account, passphrase)
-	if err != nil {
-		return nil, err
-	}
-	return w.EncryptTxWithSeed(*seed, tx, txt, state)
-
 }
 
 func (w *keystoreWallet) GetSeed() (*address.Seed, error) {

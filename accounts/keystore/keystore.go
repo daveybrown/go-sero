@@ -310,7 +310,7 @@ func (ks *KeyStore) TimedUnlock(a accounts.Account, passphrase string, timeout t
 }
 
 // Find resolves the given account into a unique entry in the keystore.
-func (ks *KeyStore) Find(a accounts.Account) (accounts.Account, error) {
+func (ks *KeyStore) FindByKey(a accounts.Account) (accounts.Account, error) {
 	ks.cache.maybeReload()
 	ks.cache.mu.Lock()
 	a, err := ks.cache.find(a)
@@ -335,7 +335,7 @@ func (ks *KeyStore) FindByPk(pk c_type.Uint512) (accounts.Account, error) {
 }
 
 func (ks *KeyStore) getDecryptedKey(a accounts.Account, auth string) (accounts.Account, *Key, error) {
-	a, err := ks.Find(a)
+	a, err := ks.FindByKey(a)
 	if err != nil {
 		return a, nil, err
 	}

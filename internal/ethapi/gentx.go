@@ -33,7 +33,7 @@ func (self *PkgCloseArgs) toCmd() *prepare.PkgCloseCmd {
 
 type PkgTransferArgs struct {
 	Id  c_type.Uint256
-	PKr AllMixedAddress
+	PKr ToAddress
 }
 
 func (self *PkgTransferArgs) toCmd() *prepare.PkgTransferCmd {
@@ -48,7 +48,7 @@ func (self *PkgTransferArgs) toCmd() *prepare.PkgTransferCmd {
 
 type PkgCreateArgs struct {
 	Id       c_type.Uint256
-	PKr      AllMixedAddress
+	PKr      ToAddress
 	Currency Smbol
 	Value    *Big
 	Memo     c_type.Uint512
@@ -230,7 +230,7 @@ func (args GenTxArgs) toTxParam() prepare.PreTxParam {
 	}
 	receptions := []prepare.Reception{}
 	for _, rec := range args.Receptions {
-		pkr := MixAdrressToPkr(rec.Addr)
+		pkr := rec.Addr.ToPkr()
 		var currency c_type.Uint256
 		bytes := common.LeftPadBytes([]byte(string(rec.Currency)), 32)
 		copy(currency[:], bytes)

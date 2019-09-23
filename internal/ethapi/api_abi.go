@@ -89,7 +89,7 @@ func encodeStringParams(abiArgs abi.Arguments, args []string) ([]interface{}, []
 	for index, arg := range abiArgs {
 		switch arg.Type.String() {
 		case "address":
-			var addr AllMixedAddress
+			var addr ToAddress
 			err := addr.UnmarshalText([]byte(args[index]))
 			if err != nil {
 				return nil, nil, err
@@ -98,7 +98,7 @@ func encodeStringParams(abiArgs abi.Arguments, args []string) ([]interface{}, []
 			packArgs[index] = common.BytesToContractAddress(caddr[:])
 			address = append(address, common.BytesToAddress(addr[:]))
 		case "address[]":
-			var addrs []AllMixedAddress
+			var addrs []ToAddress
 			err := json.Unmarshal([]byte(args[index]), &addrs)
 			if err != nil {
 				return nil, nil, err
@@ -212,7 +212,7 @@ func (s *PublicAbiAPI) PackMethod(abi *abi.ABI, contractAddr ContractAddress, me
 	return PackMethod(abi, contractAddr, methodName, args)
 }
 
-func convertToContractAddr(addrs []AllMixedAddress) (result []common.ContractAddress) {
+func convertToContractAddr(addrs []ToAddress) (result []common.ContractAddress) {
 	for _, addr := range addrs {
 		caddr := (superzk.HashPKr(addr.ToPKr().NewRef()))
 		result = append(result, common.BytesToContractAddress(caddr[:]))
@@ -220,7 +220,7 @@ func convertToContractAddr(addrs []AllMixedAddress) (result []common.ContractAdd
 	return
 }
 
-func convertToAddr(addrs []AllMixedAddress) (result []common.Address) {
+func convertToAddr(addrs []ToAddress) (result []common.Address) {
 	for _, addr := range addrs {
 		result = append(result, common.BytesToAddress(addr[:]))
 	}
