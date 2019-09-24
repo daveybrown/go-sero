@@ -336,29 +336,21 @@ func (s *Sero) ResetWithGenesisBlock(gb *types.Block) {
 	s.blockchain.ResetWithGenesisBlock(gb)
 }
 
-func (s *Sero) Serobase() (eb apiutil.PKAddress, err error) {
+func (s *Sero) Serobase() (eb accounts.Account, err error) {
 	s.lock.RLock()
 	serobase := s.serobase
 	s.lock.RUnlock()
 
 	if serobase != nil {
-		pk := serobase.GetPKByHeight()
-		copy(eb[:], pk[:])
+		return *serobase, nil
 		return
 	}
 	if wallets := s.AccountManager().Wallets(); len(wallets) > 0 {
 		if accounts := wallets[0].Accounts(); len(accounts) > 0 {
-			serobase := accounts[0]
-			s.lock.Lock()
-			s.serobase = &serobase
-			s.lock.Unlock()
-			pk := serobase.GetPKByHeight()
-			copy(eb[:], pk[:])
-			log.Info("Serobase automatically configured", "address", eb)
-			return
+			return accounts[0], nil
 		}
 	}
-	return apiutil.PKAddress{}, fmt.Errorf("Serobase must be explicitly specified")
+	return accounts.Account{}, fmt.Errorf("Serobase must be explicitly specified")
 }
 
 // SetSerobase sets the mining reward address.
@@ -375,8 +367,8 @@ func (s *Sero) SetSerobase(serobase apiutil.MixBase58Adrress) {
 }
 
 func (s *Sero) StartMining(local bool) error {
-	eb := s.serobase
-	if eb == nil {
+	eb, err := s.Serobase()
+	if err != nil {
 		log.Error("Cannot start mining without serobase", "")
 		return fmt.Errorf("serobase missing: %v")
 	}
@@ -401,7 +393,7 @@ func (s *Sero) StartMining(local bool) error {
 		// will ensure that private networks work in single miner mode too.
 		atomic.StoreUint32(&s.protocolManager.acceptTxs, 1)
 	}
-	go s.miner.Start(*eb)
+	go s.miner.Start(eb)
 	return nil
 }
 

@@ -205,7 +205,7 @@ func (self *Exchange) initWallet(w accounts.Wallet) {
 }
 
 func (self *Exchange) starNum(key common.AccountKey) uint64 {
-	value, err := self.db.Get(numKey(*key.ToUint512()))
+	value, err := self.db.Get(numKey(key))
 	if err != nil {
 		return 0
 	}
@@ -371,11 +371,11 @@ func (self *Exchange) GetMaxAvailable(pk c_type.Uint512, currency string) (amoun
 	return
 }
 
-func (self *Exchange) GetBalances(pk c_type.Uint512) (balances map[string]*big.Int) {
-	if value, ok := self.accounts.Load(pk); ok {
+func (self *Exchange) GetBalances(accountKey common.AccountKey) (balances map[string]*big.Int) {
+	if value, ok := self.accounts.Load(accountKey); ok {
 		account := value.(*Account)
 		if account.isChanged {
-			prefix := append(pkPrefix, pk[:]...)
+			prefix := append(pkPrefix, accountKey[:]...)
 			iterator := self.db.NewIteratorWithPrefix(prefix)
 			balances = map[string]*big.Int{}
 			utxoNums := map[string]uint64{}
@@ -479,10 +479,10 @@ func (self *Exchange) GenTxWithSign(param prepare.PreTxParam) (pretx *txtool.GTx
 		return
 	}
 
-	var account *Account
-	if value, ok := self.accounts.Load(param.From); ok {
-		account = value.(*Account)
-	} else {
+	fromPkr := superzk.Pk2PKr(&param.From, nil)
+	account := self.getAccountByPkr(fromPkr)
+
+	if account == nil {
 		e = errors.New("not found Pk")
 		return
 	}
@@ -724,15 +724,15 @@ func (self *Exchange) fetchBlockInfo() {
 		return
 	}
 	for {
-		indexs := map[uint64][]c_type.Uint512{}
+		indexs := map[uint64][]common.AccountKey{}
 		orders := uint64Slice{}
 		self.numbers.Range(func(key, value interface{}) bool {
-			pk := key.(c_type.Uint512)
+			pk := key.(common.AccountKey)
 			num := value.(uint64)
 			if list, ok := indexs[num]; ok {
 				indexs[num] = append(list, pk)
 			} else {
-				indexs[num] = []c_type.Uint512{pk}
+				indexs[num] = []common.AccountKey{pk}
 				orders = append(orders, num)
 			}
 			return true
@@ -765,7 +765,7 @@ func (self *Exchange) fetchBlockInfo() {
 	}
 }
 
-func (self *Exchange) fetchAndIndexUtxo(start, countBlock uint64, pks []c_type.Uint512) (count int) {
+func (self *Exchange) fetchAndIndexUtxo(start, countBlock uint64, pks []common.AccountKey) (count int) {
 
 	blocks, err := flight.SRI_Inst.GetBlocksInfo(start, countBlock)
 	if err != nil {
@@ -1035,9 +1035,9 @@ func (self *Exchange) indexBlocks(batch serodb.Batch, utxosMap map[PkKey][]Utxo,
 	return
 }
 
-func (self *Exchange) ownPkr(pks []c_type.Uint512, pkr c_type.PKr) (account *Account, ok bool) {
-	for _, pk := range pks {
-		value, ok := self.accounts.Load(pk)
+func (self *Exchange) ownPkr(accountKeys []common.AccountKey, pkr c_type.PKr) (account *Account, ok bool) {
+	for _, key := range accountKeys {
+		value, ok := self.accounts.Load(key)
 		if !ok {
 			continue
 		}
@@ -1273,8 +1273,8 @@ func blockKey(number uint64) []byte {
 	return append(blockPrefix, utils.EncodeNumber(number)...)
 }
 
-func numKey(pk c_type.Uint512) []byte {
-	return append(numPrefix, pk[:]...)
+func numKey(key common.AccountKey) []byte {
+	return append(numPrefix, key[:]...)
 }
 
 func nilKey(nil c_type.Uint256) []byte {

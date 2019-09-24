@@ -91,7 +91,7 @@ type Backend interface {
 
 	GetPkNumber(accountKey common.AccountKey) (number uint64, e error)
 	GetPkr(address *c_type.Uint512, index *c_type.Uint256) (c_type.PKr, error)
-	GetBalances(address c_type.Uint512) (balances map[string]*big.Int)
+	GetBalances(accountKey common.AccountKey) (balances map[string]*big.Int)
 	GenTx(param prepare.PreTxParam) (*txtool.GTxParam, error)
 	GetRecordsByPk(accountKey *common.AccountKey, begin, end uint64) (records []exchange.Utxo, err error)
 	GetRecordsByPkr(pkr c_type.PKr, begin, end uint64) (records []exchange.Utxo, err error)

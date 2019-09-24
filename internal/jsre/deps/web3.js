@@ -2715,7 +2715,7 @@ require=(function(){function r(e,n,t){function o(i,f){if(!n[i]){if(!e[i]){var c=
                         protocol = hexToBytes(fromUtf8(addrs[0]));
                         addrByte = base58ToBytes(addrs[1]);
                         sum =md5(protocol.concat(addrByte))
-                        checkSum = base58.encode(Buffer.from(sum,'hex')).substr(0,2);
+                        checkSum = base58.encode(hexToBytes(sum)).substr(0,2);
                         if (checkSum !== addrs[2]) {
                             return false;
                         }

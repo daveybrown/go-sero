@@ -20,13 +20,14 @@ import (
 	"bufio"
 	"encoding/json"
 	"fmt"
-	"github.com/sero-cash/go-sero/common"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/sero-cash/go-sero/common"
 
 	"github.com/sero-cash/go-sero/common/address"
 
@@ -56,7 +57,7 @@ func (s accountsByTag) Swap(i, j int) { s[i], s[j] = s[j], s[i] }
 // AmbiguousAddrError is returned when attempting to unlock
 // an address for which more than one file exists.
 type AmbiguousAddrError struct {
-	Key	    common.AccountKey
+	Key     common.AccountKey
 	Matches []accounts.Account
 }
 
@@ -114,7 +115,7 @@ func (ac *accountCache) accountsByTag() []accountByTag {
 	return cpy
 }
 
-func (ac *accountCache) hasAddress(key  common.AccountKey) bool {
+func (ac *accountCache) hasAddress(key common.AccountKey) bool {
 	ac.maybeReload()
 	ac.mu.Lock()
 	defer ac.mu.Unlock()
@@ -300,9 +301,9 @@ func (ac *accountCache) scanAccounts() error {
 		key.version = 0
 		err = json.NewDecoder(buf).Decode(&key)
 		var addressKey common.AccountKey
-		if version ==2{
-           addressKey = common.Base58ToKey(key.Key)
-		}else{
+		if key.version == version {
+			addressKey = common.Base58ToKey(key.Key)
+		} else {
 			addressKey = common.Base58ToKey(key.Address)
 		}
 

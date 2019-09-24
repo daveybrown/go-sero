@@ -34,10 +34,11 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"github.com/sero-cash/go-sero/common"
 	"io"
 	"io/ioutil"
 	"path/filepath"
+
+	"github.com/sero-cash/go-sero/common"
 
 	"github.com/btcsuite/btcutil/base58"
 
@@ -191,7 +192,6 @@ func aesCTRXOR(key, inText, iv []byte) ([]byte, error) {
 	return outText, err
 }
 
-
 func GetAddress(keyjson []byte) (string, error) {
 	// Parse the json into a simple map to fetch the key version
 	m := make(map[string]interface{})
@@ -205,9 +205,6 @@ func GetAddress(keyjson []byte) (string, error) {
 		return k.Address, nil
 	}
 }
-
-
-
 
 // DecryptKey decrypts a key from a json blob, returning the private key itself.
 func DecryptKey(keyjson []byte, auth string) (*Key, error) {
@@ -232,7 +229,7 @@ func DecryptKey(keyjson []byte, auth string) (*Key, error) {
 
 	return &Key{
 		Id:         uuid.UUID(keyId),
-		AccountKey:    crypto.PrivkeyToKey(key),
+		AccountKey: crypto.PrivkeyToKey(key),
 		Tk:         crypto.PrivkeyToTk(key),
 		PrivateKey: key,
 		At:         k.At,
@@ -244,7 +241,7 @@ func decryptKey(keyProtected *encryptedKeyJSONV1, auth string) (keyBytes []byte,
 	if keyProtected.Crypto.CipherText == "" {
 		return nil, nil, fmt.Errorf("has no privatekey for tk:%v", keyProtected.Tk)
 	}
-	if keyProtected.Version != version {
+	if keyProtected.Version > version {
 		return nil, nil, fmt.Errorf("Version not supported: %v", keyProtected.Version)
 	}
 

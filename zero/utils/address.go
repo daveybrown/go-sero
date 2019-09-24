@@ -26,7 +26,7 @@ type Address struct {
 const hextable = "0123456789abcdef"
 
 func (self *Address) calcSum() {
-	c := append([]byte(self.Protocol), self.Bytes...)
+	c := append([]byte(self.Protocol+self.Version), self.Bytes...)
 	m := md5.Sum(c)
 	s := base58.Encode(m[:])
 	self.Sum = s[:2]

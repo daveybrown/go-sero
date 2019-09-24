@@ -44,7 +44,7 @@ func (self *Account) GetPKByPK(c_pk_f *c_type.Uint512) (ret c_type.Uint512) {
 	copy(c_tk[:], self.Tk[:])
 	var c_pk c_type.Uint512
 	if c_superzk.IsSzkPK(c_pk_f) {
-		c_pk = c_superzk.Tk2Pk(&c_tk)
+		c_pk, _ = c_superzk.Tk2Pk(&c_tk)
 	} else {
 		c_pk = c_czero.Tk2Pk(&c_tk)
 	}
@@ -56,7 +56,7 @@ func (self *Account) GetPKByPKr(c_pkr *c_type.PKr) (ret c_type.Uint512) {
 	c_tk := c_type.Tk{}
 	copy(c_tk[:], self.Tk[:])
 	var c_pk c_type.Uint512
-	if c_superzk.IsSzkPKr(&c_pkr) {
+	if c_superzk.IsSzkPKr(c_pkr) {
 		c_pk, _ = c_superzk.Tk2Pk(&c_tk)
 	} else {
 		c_pk = c_czero.Tk2Pk(&c_tk)
@@ -92,7 +92,7 @@ func (self *Account) IsMyPk(pk c_type.Uint512) bool {
 	copy(c_tk[:], self.Tk[:])
 	var c_pkr c_type.PKr
 	if c_superzk.IsSzkPK(&c_pk_f) {
-		c_pkr = c_superzk.Pk2PKr(&c_pk_f, nil)
+		c_pkr, _ = c_superzk.Pk2PKr(&c_pk_f, nil)
 	} else {
 		c_pkr = c_czero.Pk2PKr(&c_pk_f, nil)
 	}

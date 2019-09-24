@@ -114,8 +114,8 @@ func (s *PublicExchangeAPI) GetBalances(ctx context.Context, pkAddr apiutil.PKAd
 	if err != nil {
 		return nil
 	}
-	pkKey := wallet.Accounts()[0].Key.ToUint512()
-	balances := s.b.GetBalances(*pkKey)
+	pkKey := wallet.Accounts()[0].Key
+	balances := s.b.GetBalances(pkKey)
 	for k, v := range balances {
 		result[k] = (*apiutil.Big)(v)
 	}

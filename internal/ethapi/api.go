@@ -293,7 +293,7 @@ func NewPrivateAccountAPI(b Backend, nonceLock *AddrLocker) *PrivateAccountAPI {
 }
 
 // ListAccounts will return a list of addresses for accounts this node manages.
-func (s *PrivateAccountAPI) PKAddress() []apiutil.PKAddress {
+func (s *PrivateAccountAPI) ListAccounts() []apiutil.PKAddress {
 	addresses := make([]apiutil.PKAddress, 0) // return [] instead of nil if empty
 	for _, wallet := range s.am.Wallets() {
 		for _, account := range wallet.Accounts() {
@@ -594,7 +594,7 @@ func (s *PublicBlockChainAPI) BlockNumber() hexutil.Uint64 {
 	return hexutil.Uint64(header.Number.Uint64())
 }
 
-func (s *PublicBlockChainAPI) CurrencyToContractAddress(ctx context.Context, cy string) (*address.AccountAddress, error) {
+func (s *PublicBlockChainAPI) CurrencyToContractAddress(ctx context.Context, cy string) (*apiutil.ContractAddress, error) {
 	state, _, err := s.b.StateAndHeaderByNumber(ctx, -1)
 	if err != nil {
 		return nil, err
@@ -611,17 +611,17 @@ func (s *PublicBlockChainAPI) CurrencyToContractAddress(ctx context.Context, cy 
 	if contractAddress == empty {
 		return nil, errors.New(cy + "not exists!")
 	}
-	contractAddr := address.BytesToAccount(contractAddress[:64])
+	contractAddr := apiutil.AddressToContractAddress(contractAddress)
 	return &contractAddr, nil
 }
 
 type ConvertAddress struct {
-	Addr      map[address.AccountAddress]common.Address `json:"addr"`
+	Addr      map[string]common.Address                 `json:"addr"`
 	ShortAddr map[common.Address]common.ContractAddress `json:"shortAddr"`
 	Rand      *c_type.Uint128                           `json:"rand"`
 }
 
-func (s *PublicBlockChainAPI) ConvertAddressParams(ctx context.Context, rand *c_type.Uint128, addresses []address.AccountAddress, dy bool) (*ConvertAddress, error) {
+func (s *PublicBlockChainAPI) ConvertAddressParams(ctx context.Context, rand *c_type.Uint128, addresses []apiutil.PrefixAddress, dy bool) (*ConvertAddress, error) {
 	empty := &c_type.Uint128{}
 	if bytes.Equal(rand[:], empty[:]) {
 		randKey := c_type.RandUint128()
@@ -632,7 +632,7 @@ func (s *PublicBlockChainAPI) ConvertAddressParams(ctx context.Context, rand *c_
 		return nil, err
 	}
 
-	addrMap := map[address.AccountAddress]common.Address{}
+	addrMap := map[string]common.Address{}
 	shortAddrMap := map[common.Address]common.ContractAddress{}
 
 	randSeed := rand.ToUint256()
@@ -643,31 +643,34 @@ func (s *PublicBlockChainAPI) ConvertAddressParams(ctx context.Context, rand *c_
 	}
 	for _, addr := range addresses {
 		onceAddr := common.Address{}
-		if state.IsContract(common.BytesToAddress(addr[:])) {
-			onceAddr = common.BytesToAddress(addr[:])
+		if state.IsContract(common.BytesToAddress(addr.Bytes)) {
+			onceAddr = common.BytesToAddress(addr.Bytes)
 		} else {
-			if !superzk.IsPKValid(addr.ToUint512()) {
-				return nil, errors.New("address must be accountAddress")
+			if addr.IsPkr() {
+				onceAddr.SetBytes(addr.Bytes)
+			} else {
+				pkr := superzk.Pk2PKr(addr.ToPk(), randSeed.NewRef())
+				onceAddr.SetBytes(pkr[:])
 			}
-			pkr := superzk.Pk2PKr(addr.ToUint512(), randSeed.NewRef())
-			onceAddr.SetBytes(pkr[:])
 		}
-		addrMap[addr] = onceAddr
+		addrMap[addr.String()] = onceAddr
 		shortAddr := superzk.HashPKr(onceAddr.ToPKr())
 		shortAddrMap[onceAddr] = common.BytesToContractAddress(shortAddr[:])
 	}
 	return &ConvertAddress{addrMap, shortAddrMap, rand}, nil
 }
 
-func (s *PublicBlockChainAPI) GetFullAddress(ctx context.Context, shortAddresses []common.ContractAddress) (map[common.ContractAddress]common.Address, error) {
+func (s *PublicBlockChainAPI) GetFullAddress(ctx context.Context, shortAddresses []common.ContractAddress) (map[common.ContractAddress]apiutil.PrefixAddress, error) {
 
 	state, _, err := s.b.StateAndHeaderByNumber(ctx, -1)
 	if err != nil {
 		return nil, err
 	}
-	addrMap := map[common.ContractAddress]common.Address{}
+	addrMap := map[common.ContractAddress]apiutil.PrefixAddress{}
 	for _, short := range shortAddresses {
+		a := apiutil.PrefixAddress{}
 		full := state.GetNonceAddress(short[:])
+		a.SetBytes(full[:])
 		//
 		//wallets := s.b.AccountManager().Wallets()
 		//
@@ -679,15 +682,15 @@ func (s *PublicBlockChainAPI) GetFullAddress(ctx context.Context, shortAddresses
 		//		}
 		//	}
 		//}
-		addrMap[short] = full
+		addrMap[short] = a
 	}
 	return addrMap, nil
 
 }
 
-func (s *PublicBlockChainAPI) GenPKr(ctx context.Context, Pk apiutil.PKAddress) (common.Address, error) {
+func (s *PublicBlockChainAPI) GenPKr(ctx context.Context, Pk apiutil.PKAddress) (apiutil.PKrAddress, error) {
 	PKr := superzk.Pk2PKr(Pk.ToUint512().NewRef(), nil)
-	result := common.Address{}
+	result := apiutil.PKrAddress{}
 	copy(result[:], PKr[:])
 	return result, nil
 }
@@ -726,7 +729,7 @@ func (s *PublicBlockChainAPI) GetBalance(ctx context.Context, addr apiutil.ToAdd
 	}
 	tkn := map[string]*hexutil.Big{}
 	result := Balance{}
-	if size := state.GetCodeSize(common.BytesToAddress(addr[:])); size > 0 {
+	if addr.IsConract() {
 		balances := state.Balances(common.BytesToAddress(addr[:]))
 		for key, value := range balances {
 			tkn[key] = (*hexutil.Big)(value)
@@ -743,7 +746,7 @@ func (s *PublicBlockChainAPI) GetBalance(ctx context.Context, addr apiutil.ToAdd
 				return result, err
 			}
 			key := walllet.Accounts()[0].Key
-			exchangBalance := s.b.GetBalances(*common.BytesToAddress(key[:]).ToUint512())
+			exchangBalance := s.b.GetBalances(key)
 			return GetBalanceFromExchange(exchangBalance), nil
 		} else {
 			return result, errors.New("lstate.balance is no longer supported")
@@ -1378,18 +1381,18 @@ func (s *PublicBlockChainAPI) rpcOutputBlock(b *types.Block, inclTx bool, fullTx
 
 // RPCTransaction represents a transaction that will serialize to the RPC representation of a transaction
 type RPCTransaction struct {
-	BlockHash        common.Hash     `json:"blockHash"`
-	BlockNumber      *hexutil.Big    `json:"blockNumber"`
-	From             common.Address  `json:"from"`
-	Gas              hexutil.Uint64  `json:"gas"`
-	GasPrice         *hexutil.Big    `json:"gasPrice"`
-	Hash             common.Hash     `json:"hash"`
-	Input            hexutil.Bytes   `json:"input"`
-	Nonce            hexutil.Uint64  `json:"nonce"`
-	To               *common.Address `json:"to"`
-	TransactionIndex hexutil.Uint    `json:"transactionIndex"`
-	Value            *hexutil.Big    `json:"value"`
-	Stx              *stx.T          `json:"stx"`
+	BlockHash        common.Hash        `json:"blockHash"`
+	BlockNumber      *hexutil.Big       `json:"blockNumber"`
+	From             apiutil.PKrAddress `json:"from"`
+	Gas              hexutil.Uint64     `json:"gas"`
+	GasPrice         *hexutil.Big       `json:"gasPrice"`
+	Hash             common.Hash        `json:"hash"`
+	Input            hexutil.Bytes      `json:"input"`
+	Nonce            hexutil.Uint64     `json:"nonce"`
+	To               *common.Address    `json:"to"`
+	TransactionIndex hexutil.Uint       `json:"transactionIndex"`
+	Value            *hexutil.Big       `json:"value"`
+	Stx              *stx.T             `json:"stx"`
 }
 
 // newRPCTransaction returns a transaction that will serialize to the RPC
@@ -1405,7 +1408,7 @@ func newRPCTransaction(tx *types.Transaction, blockHash common.Hash, blockNumber
 		to = nil
 	}
 	result := &RPCTransaction{
-		From:     tx.From(),
+		From:     apiutil.AddressToPkrAddress(tx.From()),
 		Gas:      hexutil.Uint64(tx.Gas()),
 		GasPrice: (*hexutil.Big)(tx.GasPrice()),
 		Hash:     tx.Hash(),
@@ -1618,7 +1621,7 @@ func (s *PublicTransactionPoolAPI) GetTransactionReceipt(ctx context.Context, ha
 	}
 	// If the ContractAddress is 20 0x0 bytes, assume it is not a contract creation
 	if receipt.ContractAddress != (common.Address{}) {
-		fields["contractAddress"] = address.BytesToAccount(receipt.ContractAddress[:64])
+		fields["contractAddress"] = apiutil.AddressToContractAddress(receipt.ContractAddress)
 	}
 	return fields, nil
 }

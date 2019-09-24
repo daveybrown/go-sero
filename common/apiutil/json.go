@@ -85,7 +85,7 @@ func (b *PKAddress) UnmarshalText(input []byte) error {
 	if addr, e := utils.NewAddressByString(string(input)); e != nil {
 		return e
 	} else {
-		err := ValidPkr(addr)
+		err := ValidPk(addr)
 		if err != nil {
 			return err
 		}
@@ -161,6 +161,12 @@ func (b PKrAddress) ToPKr() *c_type.PKr {
 	copy(result[:], b[:])
 
 	return result
+}
+
+func AddressToPkrAddress(address common.Address) PKrAddress {
+	var pkr PKrAddress
+	copy(pkr[:], address[:])
+	return pkr
 }
 
 func (b PKrAddress) MarshalText() ([]byte, error) {
@@ -298,6 +304,118 @@ func (b *ToAddress) UnmarshalText(input []byte) error {
 	}
 }
 
+type PrefixAddress struct {
+	Bytes  []byte
+	Prefix bool
+}
+
+func (b PrefixAddress) ToPkr() c_type.PKr {
+	pkr := c_type.PKr{}
+	if len(b.Bytes) == 64 {
+		pk := c_type.Uint512{}
+		copy(pk[:], b.Bytes)
+		pkr = superzk.Pk2PKr(&pk, nil)
+	} else {
+		copy(pkr[:], b.Bytes)
+	}
+	return pkr
+}
+
+func (b PrefixAddress) SetBytes(bys []byte) {
+	copy(b.Bytes, bys)
+	b.Prefix = true
+}
+
+func (b PrefixAddress) ToPk() *c_type.Uint512 {
+	if b.IsPkr() {
+		return nil
+	}
+	pk := c_type.Uint512{}
+	copy(pk[:], b.Bytes)
+	return &pk
+}
+
+func (b PrefixAddress) IsPkr() bool {
+	return len(b.Bytes) == 96
+}
+
+func (b PrefixAddress) IsConract() bool {
+	flag, _ := isContractAddress(b.Bytes)
+	return flag
+}
+
+func (b PrefixAddress) String() string {
+	if b.Prefix {
+		flag, _ := isContractAddress(b.Bytes)
+		if flag {
+			return string(ToAddressString(CONTRACT_PREFIX, b.Bytes))
+		}
+		if b.IsPkr() {
+			return string(ToAddressString(PKR_PREFIX, b.Bytes))
+		} else {
+			return string(ToAddressString(PK_PREFIX, b.Bytes))
+		}
+
+	} else {
+		return base58.Encode(b.Bytes)
+	}
+}
+func (b PrefixAddress) MarshalText() ([]byte, error) {
+	return []byte(b.String()), nil
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (b *PrefixAddress) UnmarshalText(input []byte) error {
+
+	if len(input) == 0 {
+		return errors.New("empty string")
+	}
+	if addr, e := utils.NewAddressByString(string(input)); e != nil {
+		return e
+	} else {
+		isConctract, err := isContractAddress(addr.Bytes)
+		if err != nil {
+			return err
+		}
+		if isConctract {
+			if !addr.MatchProtocol("SS") {
+				return errors.New("address protocol is not contract")
+			}
+			copy(b.Bytes, addr.Bytes)
+			if addr.Protocol != "" {
+				b.Prefix = true
+			}
+			return nil
+		} else {
+
+			if len(addr.Bytes) == 96 {
+				err := ValidPkr(addr)
+				if err != nil {
+					return err
+				}
+				b.Bytes = addr.Bytes
+				if addr.Protocol != "" {
+					b.Prefix = true
+				}
+				return nil
+
+			} else if len(addr.Bytes) == 64 {
+				err := ValidPk(addr)
+				if err != nil {
+					return err
+				}
+				b.Bytes = addr.Bytes
+				if addr.Protocol != "" {
+					b.Prefix = true
+				}
+				return nil
+			} else {
+				return errors.New("ToAddress must be length 64 or 96")
+			}
+		}
+	}
+}
+
 func isContractAddress(b []byte) (bool, error) {
 	var addr common.Address
 	copy(addr[:], b)
@@ -308,6 +426,12 @@ type ContractAddress c_type.PKr
 
 func (b ContractAddress) MarshalText() ([]byte, error) {
 	return ToAddressString(CONTRACT_PREFIX, b[:]), nil
+}
+
+func AddressToContractAddress(addr common.Address) ContractAddress {
+	var con ContractAddress
+	copy(con[:], addr[:])
+	return con
 }
 
 // UnmarshalText implements encoding.TextUnmarshaler.
@@ -393,7 +517,7 @@ func (b *MixAddress) UnmarshalText(input []byte) error {
 			*b = addr.Bytes
 			return nil
 		} else if len(addr.Bytes) == 64 {
-			err := ValidPkr(addr)
+			err := ValidPk(addr)
 			if err != nil {
 				return err
 			}
@@ -411,10 +535,10 @@ func (b MixBase58Adrress) ToPkr() c_type.PKr {
 	pkr := c_type.PKr{}
 	if len(b) == 64 {
 		pk := c_type.Uint512{}
-		copy(pk[:], b[:])
+		copy(pk[:], b)
 		pkr = superzk.Pk2PKr(&pk, nil)
 	} else {
-		copy(pkr[:], b[:])
+		copy(pkr[:], b)
 	}
 	return pkr
 }
@@ -436,12 +560,21 @@ func (b *MixBase58Adrress) UnmarshalText(input []byte) error {
 		if addr.IsHex {
 			return errors.New("is not base58 address")
 		}
+		flag, err := isContractAddress(addr.Bytes)
+		if err != nil {
+			return err
+		}
+		if flag {
+			return errors.New("not support contract address")
+		}
 		if len(addr.Bytes) == 96 {
 			err := ValidPkr(addr)
 			if err != nil {
 				return err
 			}
+
 			*b = addr.Bytes
+
 			return nil
 		} else if len(addr.Bytes) == 64 {
 			err := ValidPkr(addr)
@@ -460,7 +593,7 @@ func TkToPkAddress(c_tk *c_type.Tk) PKAddress {
 	var c_pk c_type.Uint512
 	height := txtool.Ref_inst.Bc.GetCurrenHeader().Number.Uint64()
 	if height >= seroparam.SIP5() {
-		c_pk = c_superzk.Tk2Pk(c_tk)
+		c_pk, _ = c_superzk.Tk2Pk(c_tk)
 	} else {
 		c_pk = c_czero.Tk2Pk(c_tk)
 	}

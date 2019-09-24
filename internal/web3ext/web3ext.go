@@ -490,6 +490,10 @@ web3._extend({
 				return formatted;
 			}
 		}),
+        new web3._extend.Property({
+			name: 'accountKeys',
+			getter: 'sero_accountKeys',
+		}),
 	]
 });
 `

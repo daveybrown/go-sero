@@ -301,11 +301,11 @@ func (b *SeroAPIBackend) GetMaxAvailable(pk c_type.Uint512, currency string) (am
 	return b.sero.exchange.GetMaxAvailable(pk, currency)
 }
 
-func (b *SeroAPIBackend) GetBalances(address c_type.Uint512) (balances map[string]*big.Int) {
+func (b *SeroAPIBackend) GetBalances(accountKey common.AccountKey) (balances map[string]*big.Int) {
 	if b.sero.exchange == nil {
 		return
 	}
-	return b.sero.exchange.GetBalances(address)
+	return b.sero.exchange.GetBalances(accountKey)
 }
 
 func (b *SeroAPIBackend) GenTx(param prepare.PreTxParam) (txParam *txtool.GTxParam, e error) {
