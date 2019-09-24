@@ -23,6 +23,8 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/sero-cash/go-sero/common/apiutil"
+
 	"github.com/pborman/uuid"
 	"github.com/sero-cash/go-sero/accounts/keystore"
 	"github.com/sero-cash/go-sero/cmd/utils"
@@ -85,7 +87,7 @@ If you want to encrypt an existing private key, it can be specified by setting
 		id := uuid.NewRandom()
 		key := &keystore.Key{
 			Id:         id,
-			Address:    crypto.PrivkeyToAddress(privateKey),
+			AccountKey: crypto.PrivkeyToKey(privateKey),
 			Tk:         crypto.PrivkeyToTk(privateKey),
 			PrivateKey: privateKey,
 		}
@@ -107,7 +109,7 @@ If you want to encrypt an existing private key, it can be specified by setting
 
 		// Output some information.
 		out := outputGenerate{
-			Address: key.Address.Base58(),
+			Address: apiutil.TkToPkAddress(key.Tk.ToTK()).String(),
 			Tk:      key.Tk.Base58(),
 		}
 		if ctx.Bool(jsonFlag.Name) {

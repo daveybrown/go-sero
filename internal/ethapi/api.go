@@ -237,7 +237,7 @@ func (s *PublicAccountAPI) Accounts() []apiutil.PKAddress {
 	addresses := make([]apiutil.PKAddress, 0) // return [] instead of nil if empty
 	for _, wallet := range s.am.Wallets() {
 		for _, account := range wallet.Accounts() {
-			addresses = append(addresses, apiutil.TkToPkAddress(account.Tk))
+			addresses = append(addresses, apiutil.TkToPkAddress(account.Tk.ToTK()))
 		}
 	}
 	return addresses
@@ -269,7 +269,7 @@ func (s *PublicAccountAPI) IsMinePKr(PKr apiutil.PKrAddress) *apiutil.PKAddress 
 	if err != nil {
 		return nil
 	}
-	pk := apiutil.TkToPkAddress(wallet.Accounts()[0].Tk)
+	pk := apiutil.TkToPkAddress(wallet.Accounts()[0].Tk.ToTK())
 	return &pk
 
 }
@@ -297,7 +297,7 @@ func (s *PrivateAccountAPI) PKAddress() []apiutil.PKAddress {
 	addresses := make([]apiutil.PKAddress, 0) // return [] instead of nil if empty
 	for _, wallet := range s.am.Wallets() {
 		for _, account := range wallet.Accounts() {
-			addresses = append(addresses, apiutil.TkToPkAddress(account.Tk))
+			addresses = append(addresses, apiutil.TkToPkAddress(account.Tk.ToTK()))
 		}
 	}
 	return addresses
@@ -350,7 +350,7 @@ func (s *PrivateAccountAPI) NewAccount(password string) (apiutil.PKAddress, erro
 	if seroparam.Is_Dev() {
 		fetchKeystore(s.am).TimedUnlock(acc, password, 0)
 	}
-	return apiutil.TkToPkAddress(acc.Tk), nil
+	return apiutil.TkToPkAddress(acc.Tk.ToTK()), nil
 }
 
 // NewAccount will create a new account and returns the mnemonic 、address for the new account.
@@ -374,7 +374,7 @@ func (s *PrivateAccountAPI) NewAccountWithMnemonic(password string) (map[string]
 	}
 	result := map[string]string{}
 	result["mnemonic"] = mnemonic
-	result["address"] = apiutil.TkToPkAddress(acc.Tk).String()
+	result["address"] = apiutil.TkToPkAddress(acc.Tk.ToTK()).String()
 	return result, nil
 }
 
@@ -391,12 +391,12 @@ func (s *PrivateAccountAPI) ImportRawKey(privkey string, password string) (apiut
 		return apiutil.PKAddress{}, err
 	}
 	acc, err := fetchKeystore(s.am).ImportECDSA(key, password)
-	return apiutil.TkToPkAddress(acc.Tk), err
+	return apiutil.TkToPkAddress(acc.Tk.ToTK()), err
 }
 
 func (s *PrivateAccountAPI) ImportTk(tk apiutil.TKAddress) (apiutil.PKAddress, error) {
 	acc, err := fetchKeystore(s.am).ImportTk(tk.ToTk())
-	return apiutil.TkToPkAddress(acc.Tk), err
+	return apiutil.TkToPkAddress(acc.Tk.ToTK()), err
 }
 
 func (s *PrivateAccountAPI) ImportMnemonic(mnemonic string, password string) (apiutil.PKAddress, error) {
@@ -416,7 +416,7 @@ func (s *PrivateAccountAPI) ImportMnemonic(mnemonic string, password string) (ap
 		return apiutil.PKAddress{}, err
 	}
 	acc, err := fetchKeystore(s.am).ImportECDSA(key, password)
-	return apiutil.TkToPkAddress(acc.Tk), err
+	return apiutil.TkToPkAddress(acc.Tk.ToTK()), err
 }
 
 // UnlockAccount will unlock the account associated with the given address with

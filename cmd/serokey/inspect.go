@@ -21,6 +21,8 @@ import (
 	"fmt"
 	"io/ioutil"
 
+	"github.com/sero-cash/go-sero/common/apiutil"
+
 	"github.com/sero-cash/go-sero/accounts/keystore"
 	"github.com/sero-cash/go-sero/cmd/utils"
 	"github.com/sero-cash/go-sero/crypto"
@@ -69,7 +71,7 @@ make sure to use this feature with great caution!`,
 		// Output all relevant information we can retrieve.
 		showPrivate := ctx.Bool("private")
 		out := outputInspect{
-			Address: key.Address.Base58(),
+			Address: apiutil.TkToPkAddress(key.Tk.ToTK()).String(),
 			Tk:      key.Tk.Base58(),
 		}
 		if showPrivate {

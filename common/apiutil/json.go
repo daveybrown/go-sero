@@ -456,8 +456,7 @@ func (b *MixBase58Adrress) UnmarshalText(input []byte) error {
 	}
 }
 
-func TkToPkAddress(tk address.AccountAddress) PKAddress {
-	c_tk := tk.ToTK()
+func TkToPkAddress(c_tk *c_type.Tk) PKAddress {
 	var c_pk c_type.Uint512
 	height := txtool.Ref_inst.Bc.GetCurrenHeader().Number.Uint64()
 	if height >= seroparam.SIP5() {
