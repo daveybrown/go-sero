@@ -488,29 +488,19 @@ func (self *Exchange) GenTxWithSign(param prepare.PreTxParam) (pretx *txtool.GTx
 	}
 
 	if param.RefundTo == nil {
-		if av, err := param.IsSzk(); err != nil {
-			e = err
-			return
-		} else {
-			if param.RefundTo = self.DefaultRefundTo(&param.From, av); param.RefundTo == nil {
-				e = errors.New("can not find default refund to")
-				return
-			}
-		}
-	} else {
-		if _, err := param.IsSzk(); err != nil {
-			e = err
+		if param.RefundTo = self.DefaultRefundTo(&param.From); param.RefundTo == nil {
+			e = errors.New("can not find default refund to")
 			return
 		}
 	}
 
 	bparam := prepare.BeforeTxParam{
-		Fee:        param.Fee,
-		GasPrice:   *param.GasPrice,
-		Utxos:      roots,
-		RefundTo:   *param.RefundTo,
-		Receptions: param.Receptions,
-		Cmds:       param.Cmds,
+		param.Fee,
+		*param.GasPrice,
+		roots,
+		*param.RefundTo,
+		param.Receptions,
+		param.Cmds,
 	}
 
 	if pretx, tx, e = self.genTx(account, &bparam); e != nil {
@@ -1145,15 +1135,15 @@ func (self *Exchange) GenMergeTx(mp *MergeParam) (txParam *txtool.GTxParam, e er
 	}
 
 	bparam := prepare.BeforeTxParam{
-		Fee: assets.Token{
+		assets.Token{
 			utils.CurrencyToUint256("SERO"),
 			utils.U256(*default_fee_value),
 		},
-		GasPrice:   *big.NewInt(1000000000),
-		Utxos:      mu.list.Roots(),
-		RefundTo:   *mp.To,
-		Receptions: receptions,
-		Cmds:       prepare.Cmds{},
+		*big.NewInt(1000000000),
+		mu.list.Roots(),
+		*mp.To,
+		receptions,
+		prepare.Cmds{},
 	}
 
 	txParam, e = self.buildTxParam(&bparam)
@@ -1197,15 +1187,15 @@ func (self *Exchange) Merge(mainPkr c_type.PKr, currency string, force bool) (co
 		}
 
 		bparam := prepare.BeforeTxParam{
-			Fee: assets.Token{
+			assets.Token{
 				utils.CurrencyToUint256("SERO"),
 				utils.U256(*default_fee_value),
 			},
-			GasPrice:   *big.NewInt(1000000000),
-			Utxos:      mu.list.Roots(),
-			RefundTo:   mainPkr,
-			Receptions: receptions,
-			Cmds:       prepare.Cmds{},
+			*big.NewInt(1000000000),
+			mu.list.Roots(),
+			mainPkr,
+			receptions,
+			prepare.Cmds{},
 		}
 
 		pretx, gtx, err := self.genTx(account, &bparam)

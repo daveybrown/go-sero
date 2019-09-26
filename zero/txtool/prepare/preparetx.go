@@ -3,8 +3,6 @@ package prepare
 import (
 	"bytes"
 
-	"github.com/sero-cash/go-czero-import/c_superzk"
-
 	"github.com/sero-cash/go-czero-import/superzk"
 
 	"github.com/sero-cash/go-sero/zero/utils"
@@ -26,35 +24,18 @@ func GenTxParam(param *PreTxParam, gen TxParamGenerator, state TxParamState) (tx
 	}
 
 	if param.RefundTo == nil {
-		if av, err := param.IsSzk(); err != nil {
-			e = err
-			return
-		} else {
-			if param.RefundTo = gen.DefaultRefundTo(&param.From, av); param.RefundTo == nil {
-				return nil, errors.New("can not find default refund to")
-			}
-		}
-	} else {
-		if av, err := param.IsSzk(); err != nil {
-			if c_superzk.IsSzkPKr(param.RefundTo) {
-				if av != AV_SUPERZK {
-					return nil, errors.New("refundto must be the same version with recv address")
-				}
-			} else {
-				if av != AV_CZERO {
-					return nil, errors.New("refundto must be the same version with recv address")
-				}
-			}
+		if param.RefundTo = gen.DefaultRefundTo(&param.From); param.RefundTo == nil {
+			return nil, errors.New("can not find default refund to")
 		}
 	}
 
 	bparam := BeforeTxParam{
-		Fee:        param.Fee,
-		GasPrice:   *param.GasPrice,
-		Utxos:      utxos,
-		RefundTo:   *param.RefundTo,
-		Receptions: param.Receptions,
-		Cmds:       param.Cmds,
+		param.Fee,
+		*param.GasPrice,
+		utxos,
+		*param.RefundTo,
+		param.Receptions,
+		param.Cmds,
 	}
 	txParam, e = BuildTxParam(state, &bparam)
 	return
